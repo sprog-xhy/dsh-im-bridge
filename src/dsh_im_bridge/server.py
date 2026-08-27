@@ -87,15 +87,20 @@ class BridgeServer:
             desc = self.hub.client.describe()
         except DshError:
             pass
+        def _pending_view(rid: str, e: dict) -> dict:
+            view = {"rpcId": rid, "kind": e["kind"], "sessionId": e["session_id"]}
+            if e.get("kind") == "question":
+                qs = e.get("questions") or ()
+                view["question"] = qs[0].question if qs else None
+                view["questionCount"] = len(qs)
+            return view
+
         return {
             "ok": True,
             "dsh": desc,
             "channels": list(self.hub.channels),
             "bindings": [b.to_dict() for b in self.hub.bindings.values()],
-            "pending": [
-                {"rpcId": rid, "kind": e["kind"], "sessionId": e["session_id"]}
-                for rid, e in self.hub.pending.items()
-            ],
+            "pending": [_pending_view(rid, e) for rid, e in self.hub.pending.items()],
         }
 
     async def _attachment(self, path: str) -> dict:

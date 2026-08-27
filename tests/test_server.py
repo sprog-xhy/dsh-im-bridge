@@ -147,6 +147,31 @@ async def test_server_message_binds_and_prompts():
 
 
 @pytest.mark.asyncio
+async def test_server_status_shows_pending_question_content():
+    dsh = FakeDsh()
+    hub = BridgeHub(dsh, catch_up=False)
+    chan = FakeChannel()
+    hub.register(chan)
+    from dsh_im_bridge.events import QuestionItem
+
+    hub.pending["rq-1"] = {
+        "kind": "question",
+        "session_id": "s-1",
+        "conversations": ["fake:c1"],
+        "questions": (QuestionItem(id="q1", question="继续吗?", options=({"label": "是"},)),),
+    }
+    server = BridgeServer(hub, port=0)
+    await server.start()
+    port = server.bound_port
+    try:
+        status = await _http_in_thread(port, "/status")
+        assert status["pending"][0]["question"] == "继续吗?"
+        assert status["pending"][0]["questionCount"] == 1
+    finally:
+        await server.stop()
+
+
+@pytest.mark.asyncio
 async def test_server_answer_and_approval():
     dsh = FakeDsh()
     hub = BridgeHub(dsh, catch_up=False)
