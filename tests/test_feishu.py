@@ -64,8 +64,66 @@ class _FakeHub:
         self.inbound.append(message)
 
 
+class _FakeWs:
+    """Records frames sent by the channel (stands in for a real WS)."""
+
+    def __init__(self):
+        self.sent = []
+
+    async def send(self, text):
+        self.sent.append(text)
+
+
 @pytest.mark.asyncio
-async def test_feishu_event_mapping():
+async def test_feishu_challenge_handshake():
+    hub = _FakeHub()
+    channel = FeishuChannel({})
+    channel.bind(hub)
+    ws = _FakeWs()
+    await channel._handle_frame(json.dumps({"type": "Challenge", "challenge": "c-123", "token": "t"}), ws)
+    reply = json.loads(ws.sent[0])
+    assert reply == {"type": "ChallengeResponse", "challenge": "c-123"}
+
+
+@pytest.mark.asyncio
+async def test_feishu_challenge_handshake_with_encryption():
+    hub = _FakeHub()
+    channel = FeishuChannel({"encryptKey": "key"})
+    channel.bind(hub)
+    ws = _FakeWs()
+    await channel._handle_frame(json.dumps({"type": "Challenge", "challenge": "c-1"}), ws)
+    reply = json.loads(ws.sent[0])
+    assert reply["type"] == "ChallengeResponse"
+    assert reply["fake_challenge"] == "c-1"
+
+
+@pytest.mark.asyncio
+async def test_feishu_event_frame_delivers():
+    hub = _FakeHub()
+    channel = FeishuChannel({"receiveChatTypes": ["p2p"]})
+    channel.bind(hub)
+    ws = _FakeWs()
+    frame = {
+        "type": "Event",
+        "event": {
+            "header": {"event_type": "im.message.receive_v1"},
+            "event": {
+                "message": {
+                    "chat_id": "oc_x",
+                    "chat_type": "p2p",
+                    "content": json.dumps({"text": "你好"}),
+                }
+            },
+        },
+    }
+    await channel._handle_frame(json.dumps(frame), ws)
+    assert ws.sent == []  # no reply needed for events
+    assert len(hub.inbound) == 1
+    assert hub.inbound[0].text == "你好"
+
+
+@pytest.mark.asyncio
+async def test_feishu_event_frame_mapping():
     hub = _FakeHub()
     channel = FeishuChannel({"receiveChatTypes": ["p2p", "group"]})
     channel.bind(hub)

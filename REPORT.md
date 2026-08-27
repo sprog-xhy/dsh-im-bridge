@@ -293,4 +293,27 @@ WOA 定义 / 飞书用哪种机器人 / QQ 用哪个 OneBot / 默认工作区 / 
 
 ---
 
+# 开发报告 (第 8 轮) — 接收协议补测 + 一键全量自检
+
+## 本轮新增(测试 79 个)
+
+1. **接收协议路径补测**(之前只测了消息映射, 没测握手/收包循环):
+   - 飞书长连接 `Challenge` 握手(含 encryptKey 时的 fake_challenge)✅;
+   - 飞书 `Event` 帧经 `_handle_frame` 投递 ✅;
+   - QQ OneBot **完整接收循环**: 真实 WS 连接 → 收到 group 消息 → 投递给 hub; 同一连接上 `send_group_msg` 往返 ✅。
+2. **一键全量自检 `scripts/verify_all.py`** — `python scripts/verify_all.py [--auto 4]` 依次跑: ① 环境自检(`--check`)→ ② 确认流程演示(agent 提问→应答→继续)→ 全部通过才退出 0。实测通过。
+   - 顺手修了 verify_all 自己的两个 bug(漏掉解释器前缀、自身 stdout 未设 UTF-8)。
+3. 测试 75 → **79 个**。
+
+## 第 8 轮实测结果
+
+- ✅ 79/79 单测通过
+- ✅ `verify_all.py` 全量自检通过(环境 OK + 确认流程 OK)
+
+## 仍待你拍板(不变)
+
+WOA 定义 / 飞书用哪种机器人 / QQ 用哪个 OneBot / 默认工作区 / 通知策略 / 常驻方式 / 管理 API 是否外露 —— 见第 1 轮第 5 节。
+
+---
+
 祝睡个好觉 🌙 明天见。

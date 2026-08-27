@@ -150,6 +150,50 @@ def test_console_emit_utf8_safe(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_qq_full_receive_loop():
+    """The channel's own loop receives a real WS message and delivers it."""
+    hub = _FakeHub()
+    channel = QQOneBotChannel({"selfId": "10001"})
+    channel.bind(hub)
+    received_actions = []
+
+    async def fake_server(ws):
+        # server pushes a group message event
+        await ws.send(
+            json.dumps(
+                {
+                    "post_type": "message",
+                    "message_type": "group",
+                    "group_id": 123,
+                    "user_id": 999,
+                    "message": [{"type": "text", "data": {"text": "hi from qq"}}],
+                }
+            )
+        )
+        # and answers any request (send path)
+        async for raw in ws:
+            req = json.loads(raw)
+            received_actions.append(req)
+            await ws.send(json.dumps({"status": "ok", "retcode": 0, "echo": req.get("echo")}))
+
+    srv = websockets.serve(fake_server, "127.0.0.1", 0)
+    async with srv as server:
+        port = server.sockets[0].getsockname()[1]
+        channel.ws_url = f"ws://127.0.0.1:{port}"
+        await channel.start()
+        await asyncio.sleep(0.5)
+        assert hub.inbound and hub.inbound[0].text == "hi from qq"
+        assert hub.inbound[0].conversation_id == "group:123"
+
+        # send path over the same connection
+        await channel.send("group:123", "reply")
+        await asyncio.sleep(0.3)
+        assert received_actions and received_actions[-1]["action"] == "send_group_msg"
+
+        await channel.stop()
+
+
+@pytest.mark.asyncio
 async def test_webhook_channel_http():
     hub = _FakeHub()
     channel = WebhookChannel({"port": 0})

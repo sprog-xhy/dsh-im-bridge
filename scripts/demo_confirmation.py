@@ -242,6 +242,7 @@ class FakeDshServer:
 async def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--auto", type=float, default=0.0, help="auto-answer after N seconds (0 = wait for you to type)")
+    p.add_argument("--wait", type=float, default=30.0, help="seconds to run before exiting")
     args = p.parse_args()
 
     for stream in (sys.stdout, sys.stderr):
@@ -276,7 +277,7 @@ async def main() -> int:
     await asyncio.sleep(0.6)  # let the mux stream connect first
     await chan.feed_text("开始任务")
     try:
-        await asyncio.sleep(30)
+        await asyncio.sleep(args.wait)
     finally:
         await hub.stop()
         await fake.stop()
