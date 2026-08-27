@@ -144,6 +144,7 @@ async def _amain(args: argparse.Namespace) -> int:
         agent_preset=config.agent_preset,
         catch_up=config.catch_up,
         catch_up_max_events=config.catch_up_max_events,
+        notify_on_start=config.notify_on_start,
     )
 
     if not config.channels:

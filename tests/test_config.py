@@ -18,6 +18,7 @@ def _cfg(**overrides):
         "max_message_chars": 2000,
         "catch_up": True,
         "catch_up_max_events": 200,
+        "notify_on_start": True,
         "channels": {},
     }
     base.update(overrides)

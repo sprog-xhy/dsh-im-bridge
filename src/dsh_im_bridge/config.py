@@ -42,6 +42,7 @@ class Config:
     max_message_chars: int
     catch_up: bool
     catch_up_max_events: int
+    notify_on_start: bool
     channels: dict  # channel name -> config dict
 
 
@@ -145,5 +146,6 @@ def load_config(path: Optional[str] = None) -> Config:
         max_message_chars=int(bridge.get("maxMessageChars", 2000)),
         catch_up=bool(bridge.get("catchUp", True)),
         catch_up_max_events=int(bridge.get("catchUpMaxEvents", 200)),
+        notify_on_start=bool(bridge.get("notifyOnStart", True)),
         channels=enabled_channels,
     )

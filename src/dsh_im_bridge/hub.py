@@ -47,8 +47,10 @@ from .parser import approval_from_frame, parse_mux_frame, question_from_frame
 log = logging.getLogger("dsh_im_bridge.hub")
 
 # Event types that produce a notification when they arrive for a bound session.
+# `step/end` is intentionally NOT included by default: it fires on every step and
+# would spam the channel on multi-step tasks — `turn/end` already marks "done".
 DEFAULT_FORWARD_EVENTS = frozenset(
-    {"user/message", "assistant/message", "tool/result", "turn/end", "step/end"}
+    {"user/message", "assistant/message", "tool/result", "turn/end"}
 )
 
 
@@ -89,6 +91,7 @@ class BridgeHub:
         agent_preset: Optional[str] = None,
         catch_up: bool = True,
         catch_up_max_events: int = 200,
+        notify_on_start: bool = True,
     ):
         self.client = client
         self.state_file = state_file
@@ -101,6 +104,7 @@ class BridgeHub:
         self.agent_preset = agent_preset
         self.catch_up = catch_up
         self.catch_up_max_events = catch_up_max_events
+        self.notify_on_start = notify_on_start
 
         self.channels: dict[str, Channel] = {}
         # conversation_key -> binding
@@ -133,6 +137,22 @@ class BridgeHub:
                 asyncio.create_task(self._catch_up(), name="catch-up")
             )
         log.info("hub started with channels: %s", ", ".join(self.channels))
+        if self.notify_on_start:
+            await self._notify_started()
+
+    async def _notify_started(self) -> None:
+        """Tell every bound conversation that the bridge is (re)started."""
+        for key in list(self.bindings):
+            channel_name, conversation_id = self._split_key(key)
+            try:
+                await self._send(
+                    channel_name,
+                    conversation_id,
+                    "✅ dsh-im-bridge 已启动（新会话消息会转给绑定的 dsh agent）",
+                    kind="notify",
+                )
+            except Exception:  # noqa: BLE001
+                log.debug("startup notification to %s failed", key)
 
     async def stop(self) -> None:
         self._stop.set()

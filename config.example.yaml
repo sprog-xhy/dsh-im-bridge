@@ -16,13 +16,17 @@ bridge:
   # defaultWorkspaceId: "13dde358-91be-4504-83d3-0168b9794ae5"
   # defaultCwd: "D:\\mycode\\python\\local-dev"
   # agentPreset: "standard"
-  # Which session event types to forward as notifications (turn/end = 任务完成).
-  # forwardEvents: ["user/message", "assistant/message", "tool/result", "turn/end", "step/end"]
+  # Which session event types to forward as notifications.
+  # Default: user/message, assistant/message, tool/result, turn/end.
+  # (step/end 默认不转发, 否则多步骤任务会刷屏; turn/end 已代表"任务完成")
+  # forwardEvents: ["user/message", "assistant/message", "tool/result", "turn/end"]
   maxMessageChars: 2000
   # On restart, backfill notifications missed while the bridge was down
   # (only for sessions that were already running before; new sessions start live).
   catchUp: true
   catchUpMaxEvents: 200
+  # Send a "bridge started" message to every bound conversation on startup.
+  notifyOnStart: true
 
 channels:
   console:

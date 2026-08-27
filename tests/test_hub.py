@@ -291,6 +291,38 @@ def test_state_load_tolerates_utf8_bom():
         assert h.bindings["rec:c1"].session_id == "s-1"
 
 
+@pytest.mark.asyncio
+async def test_startup_notification_only_bound():
+    """notifyOnStart sends a 'bridge started' note only to bound conversations."""
+    h = BridgeHub(FakeDsh(), catch_up=False)
+    chan = RecordingChannel()
+    h.register(chan)
+    from dsh_im_bridge.hub import DEFAULT_FORWARD_EVENTS, SessionBinding
+
+    assert "step/end" not in DEFAULT_FORWARD_EVENTS  # would spam on multi-step tasks
+    h._add_binding(SessionBinding("rec:c1", "s-9"))
+    await h.start()
+    await h.stop()
+    assert any("已启动" in t for _, t, k in chan.sent)
+
+
+@pytest.mark.asyncio
+async def test_step_end_not_forwarded_by_default(hub):
+    h, dsh = hub
+    chan = RecordingChannel()
+    h.register(chan)
+    from dsh_im_bridge.hub import SessionBinding
+
+    h._add_binding(SessionBinding("rec:c1", "s-9"))
+    payload = {
+        "type": "session/event",
+        "sessionId": "s-9",
+        "event": {"type": "step/end", "seq": 5, "time": 100.0, "data": {}},
+    }
+    await h._on_frame(_frame_payload(payload))
+    assert chan.sent == []
+
+
 def test_parse_answer_arg():
     assert parse_answer_arg("1:是") == [{"id": "1", "selected": [], "custom": "是"}]
     assert parse_answer_arg("1:是,2:随便") == [
