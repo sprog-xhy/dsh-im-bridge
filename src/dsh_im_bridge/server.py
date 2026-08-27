@@ -124,7 +124,7 @@ class BridgeServer:
         if pending is None:
             return {"accepted": False, "error": "no pending question for this conversation"}
         text = str(payload.get("text") or "")
-        answers = parse_answer_arg(text)
+        answers = parse_answer_arg(text, questions=pending.get("questions"))
         if answers is None:
             return {"accepted": False, "error": "answer format: 1:选项A,2:自定义文本"}
         ok = self.hub.client.answer_question(pending["rpc_id"], pending["session_id"], answers)

@@ -181,10 +181,27 @@ async def test_question_forward_and_answer(hub):
     await h._on_frame(_frame_payload(payload))
     assert any("继续?" in t for _, t, k in chan.sent)
     assert "rq-1" in h.pending
-
+    # index 1 resolves to the real question id "q1", and "是" matches an option
     await _inject(h, "/answer 1:是")
-    assert dsh.answers == [("rq-1", "s-9", [{"id": "1", "selected": [], "custom": "是"}])]
+    assert dsh.answers == [("rq-1", "s-9", [{"id": "q1", "selected": ["是"], "custom": ""}])]
     assert "rq-1" not in h.pending
+
+
+@pytest.mark.asyncio
+async def test_question_for_unbound_session_ignored(hub):
+    h, dsh = hub
+    chan = RecordingChannel()
+    h.register(chan)
+    payload = {
+        "type": "question/requested",
+        "rpcId": "rq-99",
+        "sessionId": "s-other",
+        "questions": [{"id": "q1", "question": "?"}],
+    }
+    await h._on_frame(_frame_payload(payload))
+    # must not accumulate pending for unbound sessions
+    assert "rq-99" not in h.pending
+    assert chan.sent == []
 
 
 @pytest.mark.asyncio
@@ -263,9 +280,33 @@ def test_parse_answer_arg():
         {"id": "1", "selected": [], "custom": "是"},
         {"id": "2", "selected": [], "custom": "随便"},
     ]
-    assert parse_answer_arg("q1:继续") == [{"id": "q1", "selected": ["继续"], "custom": ""}]
+    # without question metadata, values are sent as custom answers (safe)
+    assert parse_answer_arg("q1:继续") == [{"id": "q1", "selected": [], "custom": "继续"}]
     assert parse_answer_arg("") is None
     assert parse_answer_arg(":空") is None
+
+
+def test_parse_answer_arg_resolves_real_question_ids():
+    from dsh_im_bridge.events import QuestionItem
+
+    questions = [
+        QuestionItem(id="uuid-abc", question="方案?", options=({"label": "方案A"},)),
+        QuestionItem(id="uuid-def", question="补充?", multi_select=True),
+    ]
+    # index 1 -> uuid-abc, "方案A" is an option label -> selected
+    assert parse_answer_arg("1:方案A", questions=questions) == [
+        {"id": "uuid-abc", "selected": ["方案A"], "custom": ""}
+    ]
+    # index 2 -> uuid-def, custom free text
+    assert parse_answer_arg("2:随便补充", questions=questions) == [
+        {"id": "uuid-def", "selected": [], "custom": "随便补充"}
+    ]
+    # exact id works too
+    assert parse_answer_arg("uuid-def:再来一点", questions=questions) == [
+        {"id": "uuid-def", "selected": [], "custom": "再来一点"}
+    ]
+    # out-of-range index is rejected
+    assert parse_answer_arg("9:什么", questions=questions) is None
 
 
 class HistoryFakeDsh(FakeDsh):

@@ -334,21 +334,25 @@ class BridgeHub:
 
     async def _on_question(self, question: QuestionRequest) -> None:
         keys = self._by_session.get(question.session_id) or set()
+        if not keys:
+            log.info("question for unbound session %s; ignored", question.session_id)
+            return
         text = truncate(render_question(question), self.max_message_chars)
         self.pending[question.rpc_id] = {
             "kind": "question",
             "session_id": question.session_id,
             "conversations": list(keys),
+            "questions": question.questions,
         }
-        if not keys:
-            log.info("question for unbound session %s; nobody to notify", question.session_id)
-            return
         for key in list(keys):
             channel_name, conversation_id = self._split_key(key)
             await self._send(channel_name, conversation_id, text, kind="question")
 
     async def _on_approval(self, approval: ApprovalRequest, rpc_id: str) -> None:
         keys = self._by_session.get(approval.session_id) or set()
+        if not keys:
+            log.info("approval for unbound session %s; ignored", approval.session_id)
+            return
         self.pending[rpc_id] = {
             "kind": "approval",
             "session_id": approval.session_id,
@@ -356,9 +360,6 @@ class BridgeHub:
             "conversations": list(keys),
         }
         text = truncate(render_approval(approval), self.max_message_chars)
-        if not keys:
-            log.info("approval for unbound session %s; nobody to notify", approval.session_id)
-            return
         for key in list(keys):
             channel_name, conversation_id = self._split_key(key)
             await self._send(channel_name, conversation_id, text, kind="approval")
@@ -476,7 +477,7 @@ class BridgeHub:
         if pending is None:
             await self._send(message.channel, message.conversation_id, "当前没有待确认的问题。", kind="error")
             return
-        answers = parse_answer_arg(arg)
+        answers = parse_answer_arg(arg, questions=pending.get("questions"))
         if answers is None:
             await self._send(
                 message.channel,
@@ -594,17 +595,23 @@ class BridgeHub:
             log.exception("failed to save bridge state to %s", path)
 
 
-def parse_answer_arg(arg: str) -> Optional[list]:
+def parse_answer_arg(arg: str, questions=None) -> Optional[list]:
     """Parse ``/answer 1:选项A,2:自定义文本`` into answer item dicts.
 
-    Returns None when the argument is malformed. Items reference question order
-    by 1-based index, or by question id when the segment is an exact id.
+    Returns None when the argument is malformed. Each segment is ``ref:value``
+    where ``ref`` is either a 1-based question index (when ``questions`` is
+    given) or an exact question id. ``value`` that matches an option label is
+    sent as a selection; anything else is sent as a custom answer.
+
+    Real dsh question ids are arbitrary strings, so index-based refs MUST be
+    resolved against the actual question list — sending index 1 as the id gets
+    rejected by the host.
     """
     if not arg or not arg.strip():
         return None
-    answers: list[dict] = []
-    for segment in arg.split(","):
-        segment = segment.strip()
+    segments = []
+    for raw_seg in arg.split(","):
+        segment = raw_seg.strip()
         if not segment:
             continue
         if ":" in segment:
@@ -612,11 +619,33 @@ def parse_answer_arg(arg: str) -> Optional[list]:
             ref = ref.strip()
             value = value.strip()
         else:
-            ref, value = str(len(answers) + 1), segment.strip()
+            ref, value = str(len(segments) + 1), segment.strip()
         if not ref or not value:
             return None
-        if ref.isdigit():
-            answers.append({"id": str(int(ref)), "selected": [], "custom": value})
+        segments.append((ref, value))
+
+    answers: list[dict] = []
+    for idx, (ref, value) in enumerate(segments):
+        qid = None
+        if questions:
+            items = list(questions)
+            if ref.isdigit():
+                pos = int(ref)
+                if 1 <= pos <= len(items):
+                    qid = items[pos - 1].id
+            else:
+                match = next((q for q in items if q.id == ref), None)
+                qid = match.id if match is not None else None
+            if qid is None:
+                return None  # unknown index / id
         else:
-            answers.append({"id": ref, "selected": [value], "custom": ""})
+            qid = ref
+
+        if questions:
+            item = next((q for q in questions if q.id == qid), None)
+            labels = {opt.get("label") for opt in (item.options if item else ())}
+            if value in labels:
+                answers.append({"id": qid, "selected": [value], "custom": ""})
+                continue
+        answers.append({"id": qid, "selected": [], "custom": value})
     return answers or None

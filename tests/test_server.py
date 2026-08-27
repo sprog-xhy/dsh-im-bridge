@@ -7,7 +7,7 @@ import urllib.request
 import pytest
 
 from dsh_im_bridge.dsh_client import DshError
-from dsh_im_bridge.events import InboundMessage
+from dsh_im_bridge.events import InboundMessage, QuestionItem
 from dsh_im_bridge.hub import BridgeHub
 from dsh_im_bridge.server import BridgeServer
 from dsh_im_bridge.channels.base import Channel
@@ -143,13 +143,18 @@ async def test_server_answer_and_approval():
     await server.start()
     port = server.bound_port
     try:
-        # prime a pending question
-        hub.pending["rq-1"] = {"kind": "question", "session_id": "s-1", "conversations": ["fake:c1"]}
+        # prime a pending question (with its real question list)
+        hub.pending["rq-1"] = {
+            "kind": "question",
+            "session_id": "s-1",
+            "conversations": ["fake:c1"],
+            "questions": [QuestionItem(id="uuid-q", question="继续?", options=({"label": "是"},))],
+        }
         res = await _http_in_thread(
             port, "/answer", "POST", {"channel": "fake", "conversation_id": "c1", "text": "1:是"}
         )
         assert res["accepted"] is True
-        assert dsh.answers == [("rq-1", "s-1", [{"id": "1", "selected": [], "custom": "是"}])]
+        assert dsh.answers == [("rq-1", "s-1", [{"id": "uuid-q", "selected": ["是"], "custom": ""}])]
 
         # prime a pending approval
         hub.pending["ra-1"] = {
