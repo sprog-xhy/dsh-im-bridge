@@ -522,4 +522,27 @@ WOA 定义 / 飞书用哪种机器人 / QQ 用哪个 OneBot / 默认工作区 / 
 
 ---
 
+# 开发报告 (第 20 轮) — 通道测试消息
+
+## 本轮新增
+
+1. **`--test-notify <通道>` 测试消息** — 配好真实通道(飞书/QQ)后, 先发一条测试消息确认通道真的通了, 再依赖它:
+   ```
+   dsh-im-bridge --config config.yaml --test-notify feishu
+   dsh-im-bridge --config config.yaml --test-notify qq --notify-target group:12345
+   ```
+   启动通道 → 等待 WS 连接 → 发送 "✅ 这是来自 dsh-im-bridge 的测试消息" → 报告成功/失败并退出。用真实凭据直接验证发送路径。
+
+## 第 20 轮实测结果
+
+- ✅ `--test-notify console` 发送成功(plumbing 验证)
+- ✅ 未启用通道 → 明确报错并退出 1
+- ✅ 85/85 单测通过
+
+## 仍待你拍板(不变)
+
+WOA 定义 / 飞书用哪种机器人 / QQ 用哪个 OneBot / 默认工作区 / 通知策略 / 常驻方式 / 管理 API 是否外露 —— 见第 1 轮第 5 节。
+
+---
+
 祝睡个好觉 🌙 明天见。

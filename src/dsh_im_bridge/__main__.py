@@ -16,6 +16,36 @@ from .hub import BridgeHub
 from .server import BridgeServer
 
 
+async def _test_notify(config, channel_name: str, target: str) -> int:
+    """Send one test message through a configured channel, then exit.
+
+    Verifies the real send path (Feishu webhook/im, QQ OneBot, ...) with actual
+    credentials before the user relies on the bridge.
+    """
+    from .channels import create_channel
+
+    print(f"[dsh-im-bridge] test-notify channel={channel_name} target={target or '(default)'}")
+    if channel_name not in config.channels:
+        print(f"  ❌ channel {channel_name!r} is not enabled in the config")
+        return 1
+    channel = create_channel(channel_name, config.channels[channel_name])
+    try:
+        await channel.start()
+        # give WS-style channels (qq, feishu long-connection) a moment to connect
+        await asyncio.sleep(2.0)
+        await channel.send(target or "test", "✅ 这是来自 dsh-im-bridge 的测试消息")
+        print("  ✅ 测试消息发送成功。若在目标会话里看到了，说明通道已就绪。")
+        return 0
+    except Exception as exc:  # noqa: BLE001
+        print(f"  ❌ 发送失败: {exc}")
+        return 1
+    finally:
+        try:
+            await channel.stop()
+        except Exception:  # noqa: BLE001
+            pass
+
+
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="dsh-im-bridge", description="Bridge dsh agents to IM tools")
     p.add_argument("--config", default=None, help="path to a YAML config file")
@@ -25,6 +55,11 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--log-file", default=None, help="also append logs to this file (useful for hidden Windows service runs)")
     p.add_argument("--data-dir", default=None, help="directory for bridge state (default: <cwd>/.dsh-im-bridge)")
     p.add_argument("--check", action="store_true", help="run self-diagnostics and exit (no server)")
+    p.add_argument("--test-notify", default=None, metavar="CHANNEL",
+                   help="send a test message through a configured channel and exit "
+                        "(e.g. --test-notify feishu; verifies the real send path)")
+    p.add_argument("--notify-target", default=None, metavar="ID",
+                   help="conversation id for --test-notify (chat_id / group:id / private:id)")
     return p
 
 
@@ -218,6 +253,9 @@ def main(argv: list | None = None) -> int:
             if args.dsh:
                 config.dsh_base_url = args.dsh
             return asyncio.run(_check(config, args.config))
+        if args.test_notify:
+            config = load_config(args.config)
+            return asyncio.run(_test_notify(config, args.test_notify, args.notify_target or ""))
         return asyncio.run(_amain(args))
     except KeyboardInterrupt:
         return 0

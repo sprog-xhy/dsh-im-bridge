@@ -83,6 +83,10 @@ python scripts/verify_all.py --auto 4 --pytest   # 单测 + 环境 + 确认流�
 dsh-im-bridge --config config.yaml            # 等价: python -m dsh_im_bridge
 dsh-im-bridge --config config.yaml --log-file bridge.log   # 记录日志到文件
 
+# 4b) 联调真实通道后，先用 --test-notify 发一条测试消息确认通道已就绪
+dsh-im-bridge --config config.yaml --test-notify feishu             # 发到飞书群
+dsh-im-bridge --config config.yaml --test-notify qq --notify-target group:12345
+
 # 管理 API: http://127.0.0.1:8764/status
 ```
 
