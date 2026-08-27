@@ -223,31 +223,6 @@ WOA 定义 / 飞书用哪种机器人 / QQ 用哪个 OneBot / 默认工作区 / 
 
 ---
 
-# 开发报告 (第 6 轮) — 飞书发送路径测试 + 工程化收尾
-
-## 本轮新增(测试 73 个)
-
-1. **飞书 HTTP 发送路径单测**(此前只有加密/收包有测, 发送没测): 用假的飞书 API 服务器验证
-   - 自定义机器人 webhook: 请求体 `{msg_type, content:{text}}` ✅;
-   - 应用机器人: tenant token 获取 + `Authorization: Bearer` + `im/v1/messages` 请求体 ✅;
-   - token 缓存(两次发送只取一次 token)✅;
-   - 飞书返回错误码 → `FeishuError`; 未配置凭据 → `FeishuError` ✅。
-   - 为可测性把飞书 `baseUrl` 做成可配置(默认官方域名, 测试指向假服务器)。
-2. **Makefile**(Ubuntu 方便命令: `make install/test/check/run/demo`)。
-3. 清理了飞书模块一个未使用的 import。
-4. 测试 68 → **73 个**。
-
-## 第 6 轮实测结果
-
-- ✅ 73/73 单测通过
-- ✅ 飞书 webhook + 应用机器人发送路径(请求构造/token 缓存/错误处理)全部单测锁定
-
-## 仍待你拍板(不变)
-
-WOA 定义 / 飞书用哪种机器人 / QQ 用哪个 OneBot / 默认工作区 / 通知策略 / 常驻方式 / 管理 API 是否外露 —— 见第 1 轮第 5 节。
-
----
-
 # 开发报告 (第 5 轮) — 图片/附件支持
 
 ## 本轮新增(测试 68 个)
@@ -267,6 +242,31 @@ WOA 定义 / 飞书用哪种机器人 / QQ 用哪个 OneBot / 默认工作区 / 
 - ✅ 68/68 单测通过
 - ✅ `/attachment` 路由对真实 dsh 的 `session.attachment` 协议实现(单测锁定)
 - ⚠️ 真实图片附件联调需等真账号(本机测试会话里没有 agent 生成的图)
+
+## 仍待你拍板(不变)
+
+WOA 定义 / 飞书用哪种机器人 / QQ 用哪个 OneBot / 默认工作区 / 通知策略 / 常驻方式 / 管理 API 是否外露 —— 见第 1 轮第 5 节。
+
+---
+
+# 开发报告 (第 6 轮) — 飞书发送路径测试 + 工程化收尾
+
+## 本轮新增(测试 73 个)
+
+1. **飞书 HTTP 发送路径单测**(此前只有加密/收包有测, 发送没测): 用假的飞书 API 服务器验证
+   - 自定义机器人 webhook: 请求体 `{msg_type, content:{text}}` ✅;
+   - 应用机器人: tenant token 获取 + `Authorization: Bearer` + `im/v1/messages` 请求体 ✅;
+   - token 缓存(两次发送只取一次 token)✅;
+   - 飞书返回错误码 → `FeishuError`; 未配置凭据 → `FeishuError` ✅。
+   - 为可测性把飞书 `baseUrl` 做成可配置(默认官方域名, 测试指向假服务器)。
+2. **Makefile**(Ubuntu 方便命令: `make install/test/check/run/demo`)。
+3. 清理了飞书模块一个未使用的 import。
+4. 测试 68 → **73 个**。
+
+## 第 6 轮实测结果
+
+- ✅ 73/73 单测通过
+- ✅ 飞书 webhook + 应用机器人发送路径(请求构造/token 缓存/错误处理)全部单测锁定
 
 ## 仍待你拍板(不变)
 
