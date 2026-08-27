@@ -26,12 +26,14 @@ class ContentBlock:
         return cls(type="unknown", text=str(raw))
 
 
-def text_of(content: Any) -> str:
+def text_of(content: Any, *, include_reasoning: bool = True) -> str:
     """Join the textual content of a message content value.
 
     Handles the wire shapes seen in dsh session events: a content block list,
     a ``{message: {...}}`` wrapper (assistant messages), ``{content: [...],
-    source: ...}`` (user messages), and a ``{text: str}`` block.
+    source: ...}`` (user messages), and a ``{text: str}`` block. Reasoning
+    blocks are included only when ``include_reasoning`` is true (notifications
+    usually want just the answer, not the thinking).
     """
     if content is None:
         return ""
@@ -39,9 +41,9 @@ def text_of(content: Any) -> str:
         return content
     if isinstance(content, dict):
         if isinstance(content.get("message"), (dict, list, str)):
-            return text_of(content["message"])
+            return text_of(content["message"], include_reasoning=include_reasoning)
         if "content" in content:
-            return text_of(content["content"])
+            return text_of(content["content"], include_reasoning=include_reasoning)
         if isinstance(content.get("text"), str):
             return content["text"]
         return ""
@@ -51,12 +53,12 @@ def text_of(content: Any) -> str:
             if isinstance(block, dict):
                 if block.get("type") == "text":
                     parts.append(block.get("text", ""))
-                elif block.get("type") == "reasoning":
+                elif block.get("type") == "reasoning" and include_reasoning:
                     parts.append(block.get("text", ""))
                 elif block.get("type") == "tool_use":
                     parts.append(f"[tool {block.get('name', '?')}]")
                 elif block.get("type") == "tool_result":
-                    inner = text_of(block.get("content"))
+                    inner = text_of(block.get("content"), include_reasoning=include_reasoning)
                     if inner:
                         parts.append(inner)
                 elif block.get("type") == "image":

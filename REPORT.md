@@ -85,4 +85,60 @@ OK
 
 ---
 
+# 开发报告 (第 2 轮) — 新增与实测
+
+> 第 2 轮在等待你答复的同时, 自主补完了几个不依赖凭据/决策的点。上面第 1 轮报告仍然有效。
+
+## 本轮新增(全部有测试)
+
+1. **确认流程演示 (demo_confirmation.py)** — 不需要真实账号, 用模拟的 dsh wire 跑通完整的"agent 提问 → 你回答 → agent 继续"闭环, 用的是**真实的 Hub/通道代码**。运行:
+   ```
+   python scripts/demo_confirmation.py            # 手动回答
+   python scripts/demo_confirmation.py --auto 4   # 4 秒后自动回答
+   ```
+   实测输出(见下图): 问题带选项推送到通道, `/answer 1:方案A` 应答后 `答案已提交 ✅`, agent 继续并 `回合结束`。
+2. **重启补发通知 (restart catch-up)** — 桥接重启后, 对之前正在跑的会话自动补发停机期间错过的通知(只补有进度水印的会话, 新会话不刷历史)。`config.yaml` 里 `catchUp` / `catchUpMaxEvents` 可关。
+3. **Windows/Ubuntu 常驻脚本** — `scripts/run_bridge.sh|.ps1`、`scripts/install-systemd.sh`(Ubuntu 一键安装为 systemd 服务)、`scripts/install-windows-task.ps1`(Windows 登录自启任务)。
+4. **跨平台 UTF-8 修复** — 之前 console 通道在 Windows(GBK 控制台)遇到 emoji(❓✅🛠)会崩, 现已统一按 UTF-8 输出; `python -m dsh_im_bridge` 启动时也会把 stdout/stderr 设为 UTF-8。
+5. **git 仓库** — 项目已 `git init` 并提交首个版本(commit b3a34a8)。
+6. **测试扩到 42 个** — 新增: console 通道入站投递、UTF-8 输出、桥接管理 API(/status /prompt /message /answer /approval /bind)、重启补发逻辑。
+
+## 实测输出(确认流程, --auto 4)
+
+```
+[08:00:01] 用户: 开始任务
+[08:00:01] 助手
+我发现有两个可行方案，需要你确认选哪个。
+❓ **需要你确认**
+请选择方案: 采用哪个方案继续?
+   - 方案A — 快速但不稳定
+   - 方案B — 稍慢但稳定
+请回复答案（例如：1 或选项文字 / 直接输入自定义答案）…
+答案已提交 ✅
+[08:00:01] 助手
+[08:00:01] 🔧 工具结果: 执行完成，产出已保存。
+[08:00:01] ✅ 回合结束
+```
+
+## 第 2 轮实测结果
+
+- ✅ 42/42 单测通过(`python -m pytest -q`)
+- ✅ 确认流程 demo 全链路跑通(见上)
+- ✅ 真实 dsh 端到端再验证(建会话→prompt→OK→turn/end 通知), 且已把 agent 的"思考过程"从通知里剔除, 只显示最终回答
+- ✅ git 首版已提交
+
+## 仍待你拍板(同第 1 轮第 5 节, 未变)
+
+1. WOA 到底是什么?
+2. 飞书: 自定义机器人(仅通知)还是应用机器人(双向)?
+3. QQ: 用哪个 OneBot 实现, 账号是否方便挂协议端?
+4. 自动建会话的默认目录/workspace
+5. 通知策略(现在默认: 最终回答 + 工具错误/有输出 + 任务完成 + 需要确认/审批; 要不要只发"完成+确认"?)
+6. 常驻方式确认(脚本已写好, 装不装由你定)
+7. 管理 API 是否要暴露给别的机器(默认仅本机)
+
+> 备注: 过程中在 dsh 里留下几个测试会话(`session-9b10cf8e…`、`session-26d65f46…` 等), 无害, 可忽略或手动归档。
+
+---
+
 祝睡个好觉 🌙 明天见。

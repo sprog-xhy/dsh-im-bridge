@@ -97,6 +97,28 @@ curl -X POST http://127.0.0.1:8765/message \
 python scripts/e2e_smoke.py --cwd "D:/mycode/python/local-dev"
 ```
 
+### 确认流程演示 (不需要真实账号)
+
+```bash
+python scripts/demo_confirmation.py            # 手动回答
+python scripts/demo_confirmation.py --auto 4   # 4 秒后自动回答
+```
+
+用模拟的 dsh wire 跑通"agent 提问 → 你回答 `/answer 1:方案A` → agent 继续"的完整闭环(真实 Hub/通道代码)。
+
+### 常驻运行 (Windows / Ubuntu)
+
+```bash
+# Ubuntu: 一键装成 systemd 服务(登录/开机自启、崩溃自动重启)
+sudo ./scripts/install-systemd.sh /abs/path/to/dsh-im-bridge
+sudo journalctl -u dsh-im-bridge -f
+
+# Windows: 注册为登录自启计划任务
+powershell -ExecutionPolicy Bypass -File scripts\install-windows-task.ps1
+```
+
+手动前台运行: `scripts\run_bridge.ps1`(Windows) 或 `./scripts/run_bridge.sh`(Ubuntu)。
+
 ---
 
 ## 桥接管理 API (`server.py`, 默认 127.0.0.1:8764)

@@ -44,10 +44,19 @@ def event_kind_label(event: SessionEvent) -> str:
     }.get(event.type, event.type)
 
 
-def render_session_event(event: SessionEvent, *, include_time: bool = True) -> str:
-    """Render one session/event to text for a channel."""
-    text = event.text
+def render_session_event(
+    event: SessionEvent,
+    *,
+    include_time: bool = True,
+    include_reasoning: bool = False,
+) -> str:
+    """Render one session/event to text for a channel.
+
+    ``include_reasoning`` controls whether the agent's internal reasoning is
+    shown alongside its answer (default: no — notifications carry the answer).
+    """
     if event.type == "assistant/message":
+        text = text_of(event.data, include_reasoning=include_reasoning)
         parts = []
         if include_time:
             parts.append(f"[{_ts(event.time)}] 助手")
@@ -58,6 +67,7 @@ def render_session_event(event: SessionEvent, *, include_time: bool = True) -> s
         else:
             parts.append("(空消息)")
         return "\n".join(parts)
+    text = event.text
     if event.type == "user/message":
         src = event.data.get("source") or {}
         who = "用户"
