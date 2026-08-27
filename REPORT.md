@@ -334,4 +334,28 @@ WOA 定义 / 飞书用哪种机器人 / QQ 用哪个 OneBot / 默认工作区 / 
 
 ---
 
+# 开发报告 (第 10 轮) — Ubuntu 真实环境验证 ✅
+
+## 本轮新增
+
+**在你机器上的 Ubuntu (WSL2) 里做了真实跨平台验证:**
+
+- ✅ **79/79 单测在 Ubuntu 24.04 / Python 3.12.3 上全部通过**(Windows 上同样全过)——包括 WebSocket、HTTP、AES 加密、异步等所有路径, 代码本身完全跨平台。
+- ✅ **确认流程 demo 在 Ubuntu 上跑通**: agent 提问 → `/answer` 应答 → `答案已提交 ✅` → `回合结束`; 中文/emoji 在 Ubuntu 原生 UTF-8 下显示正常(无 Windows 的 GBK 问题)。
+- ✅ 两个 shell 脚本(`run_bridge.sh`、`install-systemd.sh`)通过 `bash -n` 语法检查。
+- 新增 `scripts/wsl_probe.sh`(检查本机能否连到 dsh 的连通性小工具)。
+
+## ⚠️ 发现一个真实部署问题(写给你)
+
+**在 WSL(Ubuntu)里跑桥接、而 dsh 跑在 Windows 上时, 桥接默认连不到 dsh**: WSL2 里 `127.0.0.1:10010` 是 WSL 自己的回环, 不是 Windows 的, 实测 `Connection refused`。
+解决办法(按情况选):
+1. **桥接和 dsh 放同一系统**: 都在 Windows(最省事)或都在 Ubuntu 宿主机(非 WSL);
+2. 若必须 WSL + Windows 混搭: 在 `~/.wslconfig` 开 `networkingMode=mirrored`, 或让 dsh 绑定非回环地址(`--host 0.0.0.0`)+ 配 `trustedHosts`, 桥接用 Windows 的 IP 连。
+
+## 仍待你拍板(不变)
+
+WOA 定义 / 飞书用哪种机器人 / QQ 用哪个 OneBot / 默认工作区 / 通知策略 / 常驻方式 / 管理 API 是否外露 —— 见第 1 轮第 5 节。
+
+---
+
 祝睡个好觉 🌙 明天见。

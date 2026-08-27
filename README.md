@@ -5,7 +5,9 @@ Bridge **DeepSeek Harness (dsh)** agents to IM / collaboration tools (QQ, 飞书
 * when an agent finishes a task, or needs your confirmation (a **question** / **approval**), the agent notifies you in your IM tool;
 * you can proactively send a message from your IM tool and the dsh agent on your machine will pick it up and work on it.
 
-Cross-platform: Windows + Ubuntu (Python ≥ 3.10).
+Cross-platform: Windows + Ubuntu (Python ≥ 3.10). 已在 Windows 和 Ubuntu(WSL2, Python 3.12)双环境跑通全部单测与确认流程 demo。
+
+> ⚠️ 部署提示: 桥接要和 dsh 在**同一系统/网络**里。若在 WSL(Ubuntu)里跑桥接、dsh 在 Windows, WSL 的 `127.0.0.1` 不是 Windows 的, 连不上——需开 WSL mirrored 网络或让 dsh 绑定非回环地址(见 REPORT.md 第 10 轮)。
 
 > ⚠️ 状态: 第一个可运行的版本已经完成并通过端到端实测（见 [REPORT.md](REPORT.md)）。
 > 需要真实账号才能联调飞书/QQ 的完整收发；WOA 具体协议待确认。
