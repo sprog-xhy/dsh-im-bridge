@@ -27,7 +27,6 @@ import json
 import logging
 import time
 from typing import Optional
-from urllib.parse import quote
 
 import requests
 
@@ -37,9 +36,6 @@ from .base import Channel
 log = logging.getLogger("dsh_im_bridge.channel.feishu")
 
 FEISHU_BASE = "https://open.feishu.cn"
-TOKEN_URL = f"{FEISHU_BASE}/open-apis/auth/v3/tenant_access_token/internal"
-SEND_URL = f"{FEISHU_BASE}/open-apis/im/v1/messages?receive_id_type=chat_id"
-LONG_CONN_URL = f"{FEISHU_BASE}/open-apis/event/v1/long_connection"
 
 
 class FeishuError(RuntimeError):
@@ -75,6 +71,11 @@ class FeishuChannel(Channel):
         self.app_secret = config.get("appSecret")
         self.encrypt_key = config.get("encryptKey")
         self.receive_chat_types = config.get("receiveChatTypes") or ["p2p", "group"]
+        # baseUrl is overridable so tests can point at a fake Feishu API
+        self.base_url = str(config.get("baseUrl") or FEISHU_BASE).rstrip("/")
+        self.token_url = f"{self.base_url}/open-apis/auth/v3/tenant_access_token/internal"
+        self.send_url = f"{self.base_url}/open-apis/im/v1/messages?receive_id_type=chat_id"
+        self.long_conn_url = f"{self.base_url}/open-apis/event/v1/long_connection"
         self._token: Optional[str] = None
         self._token_expires_at = 0.0
         self._ws = None
@@ -88,7 +89,7 @@ class FeishuChannel(Channel):
         if not self.app_id or not self.app_secret:
             raise FeishuError("appId and appSecret required to obtain tenant access token")
         resp = requests.post(
-            TOKEN_URL,
+            self.token_url,
             json={"app_id": self.app_id, "app_secret": self.app_secret},
             timeout=15,
         )
@@ -123,7 +124,7 @@ class FeishuChannel(Channel):
     def _send_im(self, chat_id: str, text: str) -> None:
         token = self._tenant_access_token()
         resp = requests.post(
-            f"{SEND_URL}",
+            f"{self.send_url}",
             headers={"Authorization": f"Bearer {token}"},
             json={
                 "receive_id": chat_id,
@@ -184,7 +185,7 @@ class FeishuChannel(Channel):
     def _request_endpoint(self) -> str:
         token = self._tenant_access_token()
         resp = requests.post(
-            LONG_CONN_URL,
+            self.long_conn_url,
             headers={"Authorization": f"Bearer {token}"},
             json={},
             timeout=15,
