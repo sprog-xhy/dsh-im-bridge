@@ -1,3 +1,32 @@
+# 📋 给明天睡醒的你（先看这里）
+
+**程序已经开发完成并在你机器上通过全部验证**（在 `D:\mycode\python\local-dev\dsh-im-bridge`）。你要做的就三件事：
+
+**1) 验证一下环境（30 秒）**
+```bash
+cd D:\mycode\python\local-dev\dsh-im-bridge
+python scripts\verify_all.py --auto 4 --pytest   # Ubuntu 用 python3 scripts/verify_all.py
+```
+看到 "✅ 全部通过" 就说明程序在你机器上是好的。
+
+**2) 回答下面几个问题（回复给我即可）**
+1. **WOA 协作到底是什么？**（WPS 协作？企业微信？公司内部平台？目前用通用 HTTP 端点占位，说清楚我改适配器）
+2. **飞书**：用自定义机器人（仅收通知）还是应用机器人（能双向收发）？后者需要你在[飞书开放平台](https://open.feishu.cn/app)建应用，把 app_id / app_secret 给我。
+3. **QQ**：用哪个协议端（NapCat / Lagrange / LLOneBot / go-cqhttp）？方便挂一个 QQ 小号吗？
+4. **自动建会话的默认目录**：给个固定工作目录，比如 `D:\mycode\python\local-dev\dsh-im-bridge\workdir`？
+5. **通知策略**：现在是"最终回答 + 工具错误/有输出 + 任务完成 + 需要确认/审批"。要更安静（只发完成+确认）吗？
+6. **常驻方式**：装 Windows 登录自启任务 / Ubuntu systemd 服务，还是先手动跑？
+7. **管理 API**：默认只绑 127.0.0.1（本机）。要不要给别的机器用？
+
+**3) 联调真实通道（我拿到凭据后马上做）**
+配好凭据后照 `INTEGRATION.md` 操作，用 `--test-notify feishu` 发测试消息确认通道通了，然后就能"群里喊 dsh / 手机收完成通知 / 回复确认选择"。
+
+> 聊天里的快捷指令：`/help` `/status` `/sessions` `/attach <会话ID>` `/new` `/answer 1:选项` `/allow` `/reject` `/cancel` `/history`。
+
+详细开发过程见下方 1-21 轮报告。核心结论: 所有核心场景（任务完成通知、需要你确认、你主动发消息）都已在真实 dsh 上验证通过; 飞书/QQ 代码全路径有测试, 就差真实凭据联调。
+
+---
+
 # 开发报告 (第 1 轮) — dsh-im-bridge
 
 > 写给明天(睡醒后)的我们: 本轮做了什么、实测证明了什么、哪些还没验证、有哪些需要你拍板的问题。
