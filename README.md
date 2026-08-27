@@ -70,8 +70,8 @@ pip install -e .[dev]
 # 2) 配置
 cp config.example.yaml config.yaml   # 按需开启 feishu/qq 并填入凭据
 
-# 3) 自检（推荐先跑一次：校验配置 + 探测 dsh 连通性 + 检查状态目录）
-python -m dsh_im_bridge --check --config config.yaml
+# 3) 全量自检（推荐先跑一次：环境自检 + 确认流程演示）
+python scripts/verify_all.py --auto 4
 
 # 4) 运行
 python -m dsh_im_bridge --config config.yaml
