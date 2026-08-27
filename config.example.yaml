@@ -1,0 +1,62 @@
+# dsh-im-bridge configuration (copy to config.yaml and edit)
+#
+# Secrets can be provided via environment variables instead (see .env.example):
+#   DSH_IM_BRIDGE_FEISHU_WEBHOOK_URL, DSH_IM_BRIDGE_FEISHU_APP_ID, DSH_IM_BRIDGE_FEISHU_APP_SECRET,
+#   DSH_IM_BRIDGE_QQ_WS_URL, DSH_IM_BRIDGE_QQ_ACCESS_TOKEN
+
+dsh:
+  # where `dsh web` is listening (must be the same machine, loopback by default)
+  baseUrl: "http://127.0.0.1:10010"
+
+bridge:
+  host: "127.0.0.1"          # bridge management API bind host
+  apiPort: 8764              # bridge management API port
+  stateFile: ".dsh-im-bridge/bridge-state.json"   # persisted conversation<->session bindings
+  # When a conversation first messages the bridge, where should a session be created?
+  # defaultWorkspaceId: "13dde358-91be-4504-83d3-0168b9794ae5"
+  # defaultCwd: "D:\\mycode\\python\\local-dev"
+  # agentPreset: "standard"
+  # Which session event types to forward as notifications (turn/end = 任务完成).
+  # forwardEvents: ["user/message", "assistant/message", "tool/result", "turn/end", "step/end"]
+  maxMessageChars: 2000
+  # On restart, backfill notifications missed while the bridge was down
+  # (only for sessions that were already running before; new sessions start live).
+  catchUp: true
+  catchUpMaxEvents: 200
+
+channels:
+  console:
+    enabled: true            # local terminal (also used for demos/tests)
+    # outputFile: "bridge-console.log"   # optional: also append outbound here
+
+  webhook:
+    enabled: true            # generic local HTTP endpoint any tool can POST to
+    host: "127.0.0.1"
+    port: 8765
+
+  feishu:
+    enabled: false
+    # Custom-bot webhook (send-only) — fastest way to get notifications:
+    # webhookUrl: "https://open.feishu.cn/open-apis/bot/v2/hook/<token>"
+    # Two-way app bot (send + receive):
+    # appId: "cli_xxx"
+    # appSecret: "xxx"
+    # encryptKey: "xxx"      # only if event subscription encryption is enabled
+    # receiveChatTypes: ["p2p", "group"]
+
+  qq:
+    enabled: false
+    # OneBot11 reverse WebSocket endpoint (NapCat / Lagrange.OneBot / LLOneBot / go-cqhttp).
+    # In NapCat: 网络配置 -> WS 服务器 -> 添加新项，得到 ws://127.0.0.1:3001
+    wsUrl: "ws://127.0.0.1:3001"
+    # accessToken: "xxx"
+    # allowGroups: [123456]   # empty/omitted = all groups
+    # allowUsers: []          # empty/omitted = all private chats
+    # selfId: "10001"         # the bot's own QQ number (to ignore echoes)
+
+  woa:
+    enabled: false
+    # PLACEHOLDER — "WOA 协作" needs clarification (see REPORT.md).
+    # Currently this is a generic HTTP endpoint like `webhook`, on its own port.
+    host: "127.0.0.1"
+    port: 8766

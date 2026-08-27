@@ -1,0 +1,17 @@
+[Unit]
+Description=dsh-im-bridge: DeepSeek Harness <-> IM bridge (QQ/Feishu/WOA)
+After=network.target
+
+[Service]
+Type=simple
+# Replace /path/to/dsh-im-bridge and the user account as needed.
+WorkingDirectory=/path/to/dsh-im-bridge
+ExecStart=/path/to/dsh-im-bridge/.venv/bin/python -m dsh_im_bridge --config /path/to/dsh-im-bridge/config.yaml
+Restart=on-failure
+RestartSec=3
+# Hardening (adjust if the bridge needs more access)
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

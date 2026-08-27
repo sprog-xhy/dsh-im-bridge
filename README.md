@@ -1,0 +1,138 @@
+# dsh-im-bridge
+
+Bridge **DeepSeek Harness (dsh)** agents to IM / collaboration tools (QQ, 飞书/Feishu, WOA, …), so that:
+
+* when an agent finishes a task, or needs your confirmation (a **question** / **approval**), the agent notifies you in your IM tool;
+* you can proactively send a message from your IM tool and the dsh agent on your machine will pick it up and work on it.
+
+Cross-platform: Windows + Ubuntu (Python ≥ 3.10).
+
+> ⚠️ 状态: 第一个可运行的版本已经完成并通过端到端实测（见 [REPORT.md](REPORT.md)）。
+> 需要真实账号才能联调飞书/QQ 的完整收发；WOA 具体协议待确认。
+
+---
+
+## 架构
+
+```
+   QQ / Feishu / WOA / 任意工具
+            │  (channel adapters)
+            ▼
+   ┌──────────────────────┐        loopback /api      ┌────────────────────────────┐
+   │  BridgeHub (hub.py)  │ ◄─────  unary RPC + WS ──► │   dsh web (在你的机器上)     │
+   │  - 会话绑定/路由       │        events.mux/respond  │   session.prompt / question │
+   │  - 问题/审批转发与应答  │                             │   / approval / turn/end    │
+   └──────────┬───────────┘                             └────────────────────────────┘
+              │
+   ┌──────────▼───────────┐
+   │ BridgeServer (server.py)  本地管理 HTTP API (状态/注入/应答)   │
+   └──────────────────────┘
+```
+
+关键点: **桥接进程与 dsh 在同一台机器上**, 通过 dsh web 的回环 `/api` 协议通信(不需要改 dsh 本体, 不需要浏览器)。
+
+### 已实现
+
+| 模块 | 说明 |
+|---|---|
+| `dsh_client.py` | dsh `/api` 客户端: unary RPC (`session.prompt` / `create` / `history` / …), `events.mux` WebSocket 事件流(自动重连+退避), `/api/respond` 应答问题/审批 |
+| `hub.py` | 消息路由: IM→会话 (`session.prompt`), 会话事件→IM 通知, 待确认问题/审批的转发与 `/answer` `/allow` `/reject` 指令 |
+| `channels/console.py` | 本地终端通道(也是 demo/测试通道) |
+| `channels/feishu.py` | 飞书: 自定义机器人 webhook(仅发送) + 应用机器人(收发, 事件长连接) |
+| `channels/qq.py` | QQ: OneBot11 反向 WebSocket(NapCat / Lagrange / LLOneBot / go-cqhttp) |
+| `channels/webhook.py` | 通用本地 HTTP 入站端点, 任何工具都能 POST 消息进来 |
+| `channels/woa.py` | WOA 占位(当前=通用 HTTP 端点), 待确认协议 |
+| `server.py` | 本地管理 HTTP API: `/status` `/prompt` `/message` `/answer` `/approval` `/bind` |
+
+### 会话绑定
+
+每个 IM 会话(conversation) ↔ 一个 dsh 会话(session) 的映射持久化在 `bridge-state.json`:
+
+* 首次发消息自动建一个 dsh 会话并绑定;
+* `/attach <会话ID>` 绑定到已有会话; `/new` 新建并绑定;
+* 会话绑定后, 该 dsh 会话的 `assistant/message`、`tool/result`(错误/有输出)、`turn/end`(任务完成) 会推送到 IM;
+* `question/requested` / `approval/requested` 会推送到 IM, 用 `/answer` `/allow` `/reject` 或 HTTP API 应答。
+
+---
+
+## 快速开始
+
+```bash
+# 1) 准备 (Windows / Ubuntu 均可)
+python -m venv .venv
+.\.venv\Scripts\activate        # Windows
+source .venv/bin/activate       # Ubuntu
+
+pip install -e .[dev]
+
+# 2) 配置
+cp config.example.yaml config.yaml   # 按需开启 feishu/qq 并填入凭据
+
+# 3) 运行
+python -m dsh_im_bridge --config config.yaml
+
+# 管理 API: http://127.0.0.1:8764/status
+```
+
+### 无凭据先跑通 (console + webhook 通道)
+
+```bash
+python -m dsh_im_bridge          # 默认只启用 console + webhook 通道
+```
+
+然后另开一个终端, 向 webhook 通道注入消息(首次会自动建会话并绑定):
+
+```bash
+curl -X POST http://127.0.0.1:8765/message \
+  -H 'content-type: application/json' \
+  -d '{"text": "帮我写一个 hello.py 并运行"}'
+```
+
+通知会打印在桥接进程的 stdout 上。
+
+### 对真实 dsh 的端到端自测
+
+```bash
+# 会在 dsh 里新建会话, 发一条提示, 观察 turn/end 通知转发
+python scripts/e2e_smoke.py --cwd "D:/mycode/python/local-dev"
+```
+
+---
+
+## 桥接管理 API (`server.py`, 默认 127.0.0.1:8764)
+
+| 路由 | 说明 |
+|---|---|
+| `GET /health` | 存活检查 |
+| `GET /status` | dsh + 通道 + 绑定 + 待确认列表 |
+| `POST /prompt` | `{"sessionId": "...", "text": "..."}` 直接发提示 |
+| `POST /message` | `{"channel": "webhook", "conversation_id": "x", "text": "..."}` 经某通道注入 |
+| `POST /answer` | `{"channel","conversation_id","text":"1:选项A,2:自定义"}` 回答待确认问题 |
+| `POST /approval` | `{"channel","conversation_id","outcome":"allow|reject"}` 审批 |
+| `POST /bind` | `{"channel","conversation_id","session_id"}` 绑定会话 |
+
+---
+
+## 开发 & 测试
+
+```bash
+python -m pytest -q        # 34 个单测(不依赖真实网络/账号)
+```
+
+测试覆盖: 线协议解析、DshClient(unary/respond/mux 重连)、Hub 路由(自动绑定、事件转发、问题/审批应答、指令、状态持久化)、QQ OneBot 收发、webhook HTTP。
+
+## 目录
+
+```
+src/dsh_im_bridge/
+  dsh_client.py    dsh /api 客户端
+  parser.py        线协议帧解析
+  events.py        事件模型
+  formatter.py     事件→IM 文本渲染
+  hub.py           路由核心
+  server.py        管理 HTTP API
+  httpx.py         极简线程 HTTP 服务器
+  channels/        console / feishu / qq / webhook / woa
+scripts/           probe_dsh_api / probe_dsh_mux / probe_session / e2e_smoke
+tests/             单测
+```

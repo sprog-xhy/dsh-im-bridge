@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+.pytest_cache/
+
+# Bridge runtime
+config.yaml
+.env
+.dsh-im-bridge/
+e2e-output.log
+e2e-state.json
