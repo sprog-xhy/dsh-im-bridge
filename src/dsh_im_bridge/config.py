@@ -45,6 +45,50 @@ class Config:
     channels: dict  # channel name -> config dict
 
 
+    def validate(self) -> tuple[list[str], list[str]]:
+        """Return (errors, warnings) for the current configuration.
+
+        Errors block a useful start; warnings are informational.
+        """
+        from .channels import available_channels
+
+        errors: list[str] = []
+        warnings: list[str] = []
+
+        if self.default_workspace_id and self.default_cwd:
+            errors.append(
+                "bridge: set only one of defaultWorkspaceId or defaultCwd (dsh session.create rejects both)"
+            )
+        known = set(available_channels())
+        for name in self.channels:
+            if name not in known:
+                errors.append(f"channel: unknown channel {name!r} (known: {', '.join(sorted(known))})")
+
+        feishu = self.channels.get("feishu") or {}
+        if feishu.get("webhookUrl"):
+            if feishu.get("appId") or feishu.get("appSecret"):
+                warnings.append("feishu: both webhookUrl and appId are set; webhook (send-only) takes precedence")
+        elif feishu.get("appId") and not feishu.get("appSecret"):
+            errors.append("feishu: appId set but appSecret missing (app bot needs both)")
+        elif feishu.get("appSecret") and not feishu.get("appId"):
+            errors.append("feishu: appSecret set but appId missing (app bot needs both)")
+        elif feishu:
+            warnings.append("feishu: enabled but has neither webhookUrl nor appId/appSecret — it will not connect")
+
+        if self.channels.get("qq") and not self.channels["qq"].get("wsUrl"):
+            errors.append("qq: wsUrl is required (OneBot11 reverse-WebSocket endpoint)")
+
+        if not self.channels:
+            warnings.append("no channels enabled; only the bridge management API will run")
+
+        if self.forward_events and not self.forward_events.intersection(
+            {"assistant/message", "turn/end", "user/message", "tool/result", "step/end"}
+        ):
+            warnings.append(f"bridge.forwardEvents contains unknown event types: {sorted(self.forward_events)}")
+
+        return errors, warnings
+
+
 def _merge(base: dict, overrides: dict) -> dict:
     out = dict(base)
     for key, value in overrides.items():
