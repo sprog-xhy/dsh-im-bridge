@@ -89,6 +89,8 @@ class BridgeHub:
         catch_up: bool = True,
         catch_up_max_events: int = 200,
         notify_on_start: bool = True,
+        send_retries: int = 2,
+        send_retry_delay: float = 1.0,
     ):
         self.client = client
         self.state_file = state_file
@@ -102,6 +104,8 @@ class BridgeHub:
         self.catch_up = catch_up
         self.catch_up_max_events = catch_up_max_events
         self.notify_on_start = notify_on_start
+        self.send_retries = send_retries
+        self.send_retry_delay = send_retry_delay
 
         self.channels: dict[str, Channel] = {}
         # conversation_key -> binding
@@ -639,10 +643,23 @@ class BridgeHub:
         if channel is None:
             log.warning("no channel %r to deliver message", channel_name)
             return
-        try:
-            await channel.send(conversation_id, text, kind=kind)
-        except Exception as exc:  # noqa: BLE001
-            log.exception("channel %s send failed: %s", channel_name, exc)
+        # Retry a few times with a short backoff: a transient network blip on a
+        # chat platform must not silently drop a task-completion / confirmation
+        # notification.
+        attempts = self.send_retries + 1
+        for attempt in range(1, attempts + 1):
+            try:
+                await channel.send(conversation_id, text, kind=kind)
+                return
+            except Exception as exc:  # noqa: BLE001
+                if attempt < attempts:
+                    delay = self.send_retry_delay * attempt
+                    log.warning("channel %s send failed (attempt %d/%d): %s; retrying in %.1fs",
+                                channel_name, attempt, attempts, exc, delay)
+                    await asyncio.sleep(delay)
+                else:
+                    log.exception("channel %s send failed after %d attempts: %s",
+                                  channel_name, attempts, exc)
 
     # -- binding helpers ---------------------------------------------------
     @staticmethod

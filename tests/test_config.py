@@ -20,6 +20,8 @@ def _cfg(**overrides):
         "catch_up": True,
         "catch_up_max_events": 200,
         "notify_on_start": True,
+        "send_retries": 2,
+        "send_retry_delay": 1.0,
         "channels": {},
     }
     base.update(overrides)

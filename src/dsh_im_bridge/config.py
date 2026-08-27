@@ -43,6 +43,8 @@ class Config:
     catch_up: bool
     catch_up_max_events: int
     notify_on_start: bool
+    send_retries: int
+    send_retry_delay: float
     channels: dict  # channel name -> config dict
 
 
@@ -173,5 +175,7 @@ def load_config(path: Optional[str] = None) -> Config:
         catch_up=bool(bridge.get("catchUp", True)),
         catch_up_max_events=int(bridge.get("catchUpMaxEvents", 200)),
         notify_on_start=bool(bridge.get("notifyOnStart", True)),
+        send_retries=int(bridge.get("sendRetries", 2)),
+        send_retry_delay=float(bridge.get("sendRetryDelay", 1.0)),
         channels=enabled_channels,
     )

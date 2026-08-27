@@ -78,6 +78,23 @@ class RecordingChannel(Channel):
         self.sent.append((conversation_id, text, kind))
 
 
+class FlakyChannel(RecordingChannel):
+    """Fails the first `fail_first` sends, then succeeds."""
+
+    name = "flaky"
+
+    def __init__(self, fail_first=1, config=None):
+        super().__init__(config)
+        self.fail_first = fail_first
+        self.calls = 0
+
+    async def send(self, conversation_id, text, kind="notify"):
+        self.calls += 1
+        if self.calls <= self.fail_first:
+            raise RuntimeError("boom")
+        self.sent.append((conversation_id, text, kind))
+
+
 @pytest.fixture()
 def hub():
     dsh = FakeDsh()
@@ -320,6 +337,26 @@ async def test_step_end_not_forwarded_by_default(hub):
         "event": {"type": "step/end", "seq": 5, "time": 100.0, "data": {}},
     }
     await h._on_frame(_frame_payload(payload))
+    assert chan.sent == []
+
+
+@pytest.mark.asyncio
+async def test_send_retries_then_succeeds():
+    h = BridgeHub(FakeDsh(), catch_up=False, send_retries=2, send_retry_delay=0.01)
+    chan = FlakyChannel(fail_first=2)
+    h.register(chan)
+    await h._send("flaky", "c1", "hi")
+    assert chan.calls == 3  # 2 transient failures + 1 success
+    assert chan.sent == [("c1", "hi", "notify")]
+
+
+@pytest.mark.asyncio
+async def test_send_gives_up_after_retries_without_raising():
+    h = BridgeHub(FakeDsh(), catch_up=False, send_retries=2, send_retry_delay=0.01)
+    chan = FlakyChannel(fail_first=99)  # always fails
+    h.register(chan)
+    await h._send("flaky", "c1", "hi")  # must not raise
+    assert chan.calls == 3  # 1 initial + 2 retries, then gives up
     assert chan.sent == []
 
 
