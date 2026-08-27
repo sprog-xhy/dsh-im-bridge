@@ -1,17 +1,19 @@
 """Tests for the Feishu channel (crypto + event mapping).
 
 The AES decrypt and event-parsing paths can be unit-tested without a real
-Feishu app; only the network long-connection needs live credentials.
+Feishu app; only the live long-connection against Feishu needs real credentials.
 """
 
+import asyncio
 import base64
 import hashlib
 import json
 
 import pytest
+import websockets
 
 from dsh_im_bridge.channels import feishu
-from dsh_im_bridge.channels.feishu import FeishuChannel, _aes_decrypt
+from dsh_im_bridge.channels.feishu import FeishuChannel, FeishuError, _aes_decrypt
 
 
 def _feishu_encrypt(encrypt_key: str, plaintext: str) -> str:
@@ -165,3 +167,71 @@ async def test_feishu_event_ignores_other_types_and_chats():
         }
     )
     assert hub.inbound == []
+
+
+@pytest.mark.asyncio
+async def test_long_conn_loop_handshake_and_delivery():
+    """The long-connection loop: connect -> Challenge handshake -> Event ->
+    delivery -> drop -> try to reconnect."""
+    hub = _FakeHub()
+    channel = FeishuChannel({"receiveChatTypes": ["p2p"]})
+    channel.bind(hub)
+
+    async def fake_ws(ws):
+        await ws.send(json.dumps({"type": "Challenge", "challenge": "c-1"}))
+        await ws.send(
+            json.dumps(
+                {
+                    "type": "Event",
+                    "event": {
+                        "header": {"event_type": "im.message.receive_v1"},
+                        "event": {
+                            "message": {
+                                "chat_id": "oc_x",
+                                "chat_type": "p2p",
+                                "content": json.dumps({"text": "你好"}),
+                            }
+                        },
+                    },
+                }
+            )
+        )
+        # Real Feishu keeps the connection open and waits for the
+        # ChallengeResponse handshake; only close after receiving it.
+        try:
+            await asyncio.wait_for(ws.recv(), timeout=3)
+        except Exception:  # noqa: BLE001
+            pass
+        await ws.close()  # drop the connection to trigger a reconnect attempt
+
+    srv = websockets.serve(fake_ws, "127.0.0.1", 0)
+    async with srv as server:
+        port = server.sockets[0].getsockname()[1]
+        url = f"ws://127.0.0.1:{port}"
+        calls = {"n": 0}
+
+        def fake_request_endpoint():
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return url
+            raise FeishuError("no more endpoints")  # second reconnect fails fast
+
+        channel._request_endpoint = fake_request_endpoint
+        task = asyncio.create_task(channel._long_conn_loop())
+
+        async def wait_delivered():
+            for _ in range(50):
+                if hub.inbound:
+                    return
+                await asyncio.sleep(0.05)
+
+        try:
+            await asyncio.wait_for(wait_delivered(), timeout=5)
+            assert hub.inbound[0].text == "你好"
+            assert calls["n"] >= 1  # endpoint was requested at least once
+        finally:
+            task.cancel()
+            try:
+                await task
+            except (asyncio.CancelledError, Exception):  # noqa: BLE001
+                pass
