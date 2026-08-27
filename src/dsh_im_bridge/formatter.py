@@ -13,15 +13,6 @@ from typing import Optional
 
 from .events import ApprovalRequest, QuestionRequest, SessionEvent, extract_attachments, text_of
 
-# Event types that represent the agent actually saying something to the user.
-FINAL_MESSAGE_EVENTS = frozenset(
-    {"assistant/message", "user/message", "tool/result", "request/context"}
-)
-
-TURN_START = frozenset({"request/header", "request/context"})
-TURN_END = "turn/end"
-STEP_END = "step/end"
-
 
 def _ts(time_ms: float) -> str:
     try:
@@ -29,19 +20,6 @@ def _ts(time_ms: float) -> str:
     except (OverflowError, OSError, ValueError):
         return "?"
     return dt.strftime("%H:%M:%S")
-
-
-def event_kind_label(event: SessionEvent) -> str:
-    return {
-        "assistant/message": "💬 助手",
-        "user/message": "👤 用户",
-        "tool/result": "🔧 工具",
-        "request/header": "▶ 回合开始",
-        "request/context": "🧭 上下文",
-        "turn/end": "✅ 回合结束",
-        "step/end": "🟰 步骤结束",
-        "assistant/chunk": "",
-    }.get(event.type, event.type)
 
 
 def render_session_event(

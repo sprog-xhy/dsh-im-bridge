@@ -316,4 +316,22 @@ WOA 定义 / 飞书用哪种机器人 / QQ 用哪个 OneBot / 默认工作区 / 
 
 ---
 
+# 开发报告 (第 9 轮) — 代码清理 + 回归
+
+## 本轮新增
+
+1. **死代码清理** — 移除了 `formatter.py` 里未使用的常量(`FINAL_MESSAGE_EVENTS`/`TURN_START`/`TURN_END`/`STEP_END`)和 `event_kind_label`, 以及 `hub.py` 里对应的死 import 和一处函数内冗余 import。纯清理, 无行为变化。
+2. **回归** — 79/79 单测通过; `verify_all.py` 全量自检再次通过(环境 OK + 确认流程 OK)。
+
+## 第 9 轮实测结果
+
+- ✅ 79/79 单测通过
+- ✅ `verify_all.py` 全量自检通过
+
+## 仍待你拍板(不变)
+
+WOA 定义 / 飞书用哪种机器人 / QQ 用哪个 OneBot / 默认工作区 / 通知策略 / 常驻方式 / 管理 API 是否外露 —— 见第 1 轮第 5 节。
+
+---
+
 祝睡个好觉 🌙 明天见。

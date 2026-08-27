@@ -32,9 +32,6 @@ from .events import (
     SessionEvent,
 )
 from .formatter import (
-    FINAL_MESSAGE_EVENTS,
-    STEP_END,
-    TURN_END,
     answer_help_text,
     attachment_hint,
     render_approval,
@@ -802,7 +799,6 @@ def find_missed_questions(events: list) -> list:
             questions = ()
         if not questions:
             continue
-        from .events import QuestionRequest
 
         q = QuestionRequest(rpc_id="", session_id="", questions=questions, raw={})
         missed.append(
