@@ -39,14 +39,14 @@ Cross-platform: Windows + Ubuntu (Python ≥ 3.10). 已在 Windows 和 Ubuntu(WS
 
 | 模块 | 说明 |
 |---|---|
-| `dsh_client.py` | dsh `/api` 客户端: unary RPC (`session.prompt` / `create` / `history` / …), `events.mux` WebSocket 事件流(自动重连+退避), `/api/respond` 应答问题/审批 |
-| `hub.py` | 消息路由: IM→会话 (`session.prompt`), 会话事件→IM 通知, 待确认问题/审批的转发与 `/answer` `/allow` `/reject` 指令 |
+| `dsh_client.py` | dsh `/api` 客户端: unary RPC (`session.prompt` / `create` / `history` / `attachment` / …), `events.mux` WebSocket 事件流(自动重连+退避), `/api/respond` 应答问题/审批 |
+| `hub.py` | 消息路由: IM→会话 (`session.prompt`), 会话事件→IM 通知, 问题/审批转发与 `/answer` `/allow` `/reject` 指令, 发送重试, 重启补发, 启动通知 |
 | `channels/console.py` | 本地终端通道(也是 demo/测试通道) |
-| `channels/feishu.py` | 飞书: 自定义机器人 webhook(仅发送) + 应用机器人(收发, 事件长连接) |
+| `channels/feishu.py` | 飞书: 自定义机器人 webhook(仅发送) + 应用机器人(收发, 事件长连接, AES 解密) |
 | `channels/qq.py` | QQ: OneBot11 反向 WebSocket(NapCat / Lagrange / LLOneBot / go-cqhttp) |
 | `channels/webhook.py` | 通用本地 HTTP 入站端点, 任何工具都能 POST 消息进来 |
 | `channels/woa.py` | WOA 占位(当前=通用 HTTP 端点), 待确认协议 |
-| `server.py` | 本地管理 HTTP API: `/status` `/prompt` `/message` `/answer` `/approval` `/bind` |
+| `server.py` | 本地管理 HTTP API: `/status`(含待确认问题内容) `/prompt` `/message` `/answer` `/approval` `/bind` `/attachment` |
 
 ### 会话绑定
 
@@ -57,7 +57,7 @@ Cross-platform: Windows + Ubuntu (Python ≥ 3.10). 已在 Windows 和 Ubuntu(WS
 * 会话绑定后, 该 dsh 会话的 `assistant/message`、`tool/result`(错误/有输出)、`turn/end`(任务完成) 会推送到 IM;
 * `question/requested` / `approval/requested` 会推送到 IM, 用 `/answer` `/allow` `/reject` 或 HTTP API 应答;
 * `/cancel` 中断绑定会话(例如它卡在等待确认上), `/history [N]` 拉取最近记录;
-* 桥接停机期间 agent 若问了问题(dsh 不重放), 重启后会自动提醒你, 可用 `/cancel` 或 `/history` 处理。
+* 桥接重启后, dsh 会重新推送未答复的问题(只要会话已绑定), 桥接会自动重新捕获并通知你; 另有兜底检测提醒"离线期间未答复的确认请求", 可用 `/cancel` 或 `/history` 处理。
 
 ---
 
