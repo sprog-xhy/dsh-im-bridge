@@ -10,6 +10,8 @@ Cross-platform: Windows + Ubuntu (Python ≥ 3.10). 已在 Windows 和 Ubuntu(WS
 > ⚠️ 部署提示: 桥接要和 dsh 在**同一系统/网络**里。若在 WSL(Ubuntu)里跑桥接、dsh 在 Windows, WSL 的 `127.0.0.1` 不是 Windows 的, 连不上——需开 WSL mirrored 网络或让 dsh 绑定非回环地址(见 REPORT.md 第 10 轮)。
 
 > ⚠️ 状态: 第一个可运行的版本已经完成并通过端到端实测（见 [REPORT.md](REPORT.md)）。
+>
+> 📘 **飞书 / QQ / WOA 的逐步联调步骤见 [INTEGRATION.md](INTEGRATION.md)**（建飞书应用、跑 NapCat 等，跟着做就能通）。
 > 需要真实账号才能联调飞书/QQ 的完整收发；WOA 具体协议待确认。
 
 ---
