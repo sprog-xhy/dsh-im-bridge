@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from dsh_im_bridge.dsh_client import DshError
-from dsh_im_bridge.hub import BridgeHub, parse_answer_arg
+from dsh_im_bridge.hub import BridgeHub, find_missed_questions, parse_answer_arg
 from dsh_im_bridge.parser import parse_mux_frame
 from dsh_im_bridge.events import InboundMessage
 from dsh_im_bridge.channels.base import Channel
@@ -55,6 +55,9 @@ class FakeDsh:
         if session_id == "s-999":
             raise DshError("session.history", "no such session")
         return {"events": [], "hasMore": False}
+
+    def cancel(self, session_id):
+        self.cancelled = getattr(self, "cancelled", []) + [session_id]
 
 
 class RecordingChannel(Channel):
@@ -307,6 +310,80 @@ def test_parse_answer_arg_resolves_real_question_ids():
     ]
     # out-of-range index is rejected
     assert parse_answer_arg("9:什么", questions=questions) is None
+
+
+def test_find_missed_questions():
+    """ask_user_question tool call without a matching tool result is detected."""
+    def tc(seq, call_id, answered=False):
+        return {
+            "event": {
+                "type": "tool/call",
+                "seq": seq,
+                "data": {
+                    "callId": call_id,
+                    "name": "ask_user_question",
+                    "arguments": json.dumps(
+                        {"questions": [{"id": "q-x", "question": "继续吗?", "options": [{"label": "是"}]}]},
+                        ensure_ascii=False,
+                    ),
+                },
+            }
+        }
+
+    def tr(seq, call_id):
+        return {
+            "event": {
+                "type": "tool/result",
+                "seq": seq,
+                "data": {"callId": call_id, "message": {"content": [{"type": "tool-result", "toolCallId": call_id}]}},
+            }
+        }
+
+    events = [tc(1, "c-answered"), tr(2, "c-answered"), tc(3, "c-missed"), tc(4, "c-missed2")]
+    missed = find_missed_questions(events)
+    assert {m["call_id"] for m in missed} == {"c-missed", "c-missed2"}
+    assert "继续吗?" in missed[0]["text"]
+    assert missed[0]["questions"][0].id == "q-x"
+
+
+def test_find_missed_questions_ignores_non_question_tools():
+    events = [
+        {
+            "event": {
+                "type": "tool/call",
+                "seq": 1,
+                "data": {"callId": "c-1", "name": "bash", "arguments": "{}"},
+            }
+        }
+    ]
+    assert find_missed_questions(events) == []
+
+
+@pytest.mark.asyncio
+async def test_cancel_command_interrupts_session(hub):
+    h, dsh = hub
+    chan = RecordingChannel()
+    h.register(chan)
+    from dsh_im_bridge.hub import SessionBinding
+
+    h._add_binding(SessionBinding("rec:c1", "s-9"))
+    await _inject(h, "/cancel")
+    assert any("中断" in t for _, t, k in chan.sent)
+
+
+@pytest.mark.asyncio
+async def test_history_command_pulls_log():
+    dsh = HistoryFakeDsh(
+        events=[_history_event(1, "assistant/message", "summary line")]
+    )
+    h = BridgeHub(dsh, catch_up=False)
+    chan = RecordingChannel()
+    h.register(chan)
+    from dsh_im_bridge.hub import SessionBinding
+
+    h._add_binding(SessionBinding("rec:c1", "s-9"))
+    await h._handle_inbound(InboundMessage(channel="rec", conversation_id="c1", text="/history 5"))
+    assert any("summary line" in t for _, t, k in chan.sent)
 
 
 class HistoryFakeDsh(FakeDsh):

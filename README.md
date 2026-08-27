@@ -51,7 +51,9 @@ Cross-platform: Windows + Ubuntu (Python ≥ 3.10).
 * 首次发消息自动建一个 dsh 会话并绑定;
 * `/attach <会话ID>` 绑定到已有会话; `/new` 新建并绑定;
 * 会话绑定后, 该 dsh 会话的 `assistant/message`、`tool/result`(错误/有输出)、`turn/end`(任务完成) 会推送到 IM;
-* `question/requested` / `approval/requested` 会推送到 IM, 用 `/answer` `/allow` `/reject` 或 HTTP API 应答。
+* `question/requested` / `approval/requested` 会推送到 IM, 用 `/answer` `/allow` `/reject` 或 HTTP API 应答;
+* `/cancel` 中断绑定会话(例如它卡在等待确认上), `/history [N]` 拉取最近记录;
+* 桥接停机期间 agent 若问了问题(dsh 不重放), 重启后会自动提醒你, 可用 `/cancel` 或 `/history` 处理。
 
 ---
 

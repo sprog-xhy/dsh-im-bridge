@@ -47,6 +47,9 @@ class FakeDsh:
     def history(self, session_id, max_messages=50, before_seq=None):
         return {"events": [], "hasMore": False}
 
+    def cancel(self, session_id):
+        pass
+
     async def stream(self, on_frame, *, stop=None, backoff=None):
         if stop is not None:
             await stop.wait()

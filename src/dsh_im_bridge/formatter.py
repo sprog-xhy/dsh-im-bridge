@@ -135,6 +135,8 @@ def answer_help_text() -> str:
         "  /allow / /reject   允许/拒绝当前审批\n"
         "  /attach <会话ID>   把本会话绑定到指定 dsh 会话\n"
         "  /new            新建一个 dsh 会话并绑定\n"
+        "  /cancel         中断当前绑定的 dsh 会话（例如它卡在等待确认上）\n"
+        "  /history [N]    拉取绑定会话最近 N 条记录\n"
     )
 
 

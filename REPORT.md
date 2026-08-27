@@ -162,4 +162,29 @@ pending 数 -> 0
 
 ---
 
+# 开发报告 (第 3 轮) — 健壮性补强
+
+## 本轮新增(全部有测试, 测试 52 个)
+
+1. **停机期间"未答复确认请求"的检测与提醒** — 针对第 2 轮发现"dsh 重启后不重放未答复问题"的补强: 桥接重启做 catch-up 时, 会扫描 `session.history` 里 `ask_user_question` 的 `tool/call`(用真实 callId 数据验证过), 若没有对应的 `tool/result`, 说明那是停机期间漏掉的确认请求、还在 dsh 侧挂起, 会主动推给你: "⚠️ 检测到桥接离线期间的未答复确认请求…可 /cancel 中断该会话或 /history 查看上下文"。
+2. **`/cancel` 指令** — 中断当前绑定的 dsh 会话(专门用来处理上面那种卡在等待确认的会话); `/cancel-question` 保留为取消当前待确认问题。
+3. **`/history [N]` 指令** — 把绑定会话最近 N 条记录拉进 IM, 方便停机后快速补上下文。
+4. **飞书加密与收包路径的单测**(此前完全没测过):
+   - AES-256-CBC(Feishu 格式: sha256(encryptKey) 作密钥、前 16 字节作 IV、PKCS7)往返解密 ✅;
+   - `im.message.receive_v1` 事件 → InboundMessage 映射(chat_id/chat_type、`@_user_1` 清洗、chat 类型白名单)✅。
+   - **顺带修了一个真 bug**: 飞书事件里 `chat_id`/`chat_type` 直接在 message 对象上, 我原来错误地按 `message.chat` 取, 会导致飞书消息收不到。已修 + 测试锁定。
+5. `cryptography` 列为 `[feishu]` 可选依赖(只有飞书开 encryptKey 才需要)。
+
+## 第 3 轮实测结果
+
+- ✅ 52/52 单测通过
+- ✅ 用真实 dsh 的 `tool/call`(ask_user_question)数据结构验证了"未答复确认请求"检测逻辑
+- ✅ 飞书加密/收包在无账号的情况下通过单测验证(联调仍需真账号)
+
+## 仍待你拍板(不变)
+
+WOA 定义 / 飞书用哪种机器人 / QQ 用哪个 OneBot / 默认工作区 / 通知策略 / 常驻方式 / 管理 API 是否外露 —— 见第 1 轮第 5 节。
+
+---
+
 祝睡个好觉 🌙 明天见。

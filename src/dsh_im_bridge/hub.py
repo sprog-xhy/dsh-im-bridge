@@ -27,6 +27,7 @@ from .events import (
     ApprovalRequest,
     InboundMessage,
     OutboundMessage,
+    QuestionItem,
     QuestionRequest,
     SessionEvent,
 )
@@ -235,6 +236,11 @@ class BridgeHub:
         Only sessions that have a known notified-seq watermark are replayed
         (i.e. the bridge ran before and left off somewhere); brand-new bindings
         are left to go live from now on, so a first start never spams history.
+
+        Also detects `ask_user_question` tool calls in the replay window that
+        have no matching tool result: those were confirmation requests that
+        arrived while the bridge was down, are still pending on the host (dsh
+        does not re-broadcast them), and need the user's attention.
         """
         try:
             sessions = {b.session_id for b in self.bindings.values()}
@@ -266,6 +272,7 @@ class BridgeHub:
                         raw=raw,
                     )
                     await self._forward_session_event(event)
+                await self._notify_missed_questions(session_id, events)
                 if events:
                     last = max(int((e.get("event") or {}).get("seq", 0)) for e in events)
                     if last > self._notified_seq.get(session_id, -1):
@@ -276,6 +283,24 @@ class BridgeHub:
             raise
         except Exception as exc:  # noqa: BLE001
             log.exception("catch-up failed: %s", exc)
+
+    async def _notify_missed_questions(self, session_id: str, events: list) -> None:
+        """Alert bound conversations about confirmation requests that were
+        missed while the bridge was down (still pending on the host)."""
+        keys = self._by_session.get(session_id)
+        if not keys:
+            return
+        missed = find_missed_questions(events)
+        if not missed:
+            return
+        text = (
+            "⚠️ **检测到桥接离线期间的未答复确认请求**\n"
+            "该会话仍在等待你的答复，但 dsh 不会重放它；可回复 /cancel 中断这个会话，或 /history 查看上下文。\n"
+            + "\n".join(m["text"] for m in missed)
+        )
+        for key in list(keys):
+            channel_name, conversation_id = self._split_key(key)
+            await self._send(channel_name, conversation_id, truncate(text, self.max_message_chars), kind="question")
 
     async def _on_frame(self, parsed: dict) -> None:
         kind = parsed.get("kind")
@@ -402,8 +427,12 @@ class BridgeHub:
             await self._cmd_new(message)
         elif cmd == "answer":
             await self._cmd_answer(message, key, arg)
-        elif cmd in ("cancel-question", "cancel"):
+        elif cmd == "cancel-question":
             await self._cmd_cancel_question(message, key)
+        elif cmd == "cancel":
+            await self._cmd_cancel(message, key)
+        elif cmd in ("history", "log"):
+            await self._cmd_history(message, key, arg)
         elif cmd in ("allow", "approve"):
             await self._cmd_approval(message, key, "allowed-once")
         elif cmd in ("reject", "deny"):
@@ -508,6 +537,57 @@ class BridgeHub:
         )
         if ok:
             self.pending.pop(pending["rpc_id"], None)
+
+    async def _cmd_cancel(self, message: InboundMessage, key: str) -> None:
+        """Interrupt the bound dsh session (e.g. it is stuck waiting on a
+        confirmation that was missed while the bridge was down)."""
+        binding = self.bindings.get(key)
+        if binding is None:
+            await self._send(message.channel, message.conversation_id, "当前会话未绑定 dsh 会话。", kind="error")
+            return
+        try:
+            self.client.cancel(binding.session_id)
+        except DshError as exc:
+            await self._send(message.channel, message.conversation_id, f"取消失败: {exc}", kind="error")
+            return
+        await self._send(message.channel, message.conversation_id, f"已中断会话 {binding.session_id} ✅")
+
+    async def _cmd_history(self, message: InboundMessage, key: str, arg: str) -> None:
+        """Pull the recent tail of the bound session's log into the chat."""
+        binding = self.bindings.get(key)
+        if binding is None:
+            await self._send(message.channel, message.conversation_id, "当前会话未绑定 dsh 会话。", kind="error")
+            return
+        try:
+            count = int(arg) if arg.isdigit() else 12
+        except ValueError:
+            count = 12
+        try:
+            page = self.client.history(binding.session_id, max_messages=count)
+        except DshError as exc:
+            await self._send(message.channel, message.conversation_id, f"读取历史失败: {exc}", kind="error")
+            return
+        lines = [f"**会话 {binding.session_id} 最近记录**"]
+        for entry in (page.get("events") or []):
+            ev = entry.get("event") or {}
+            event = SessionEvent(
+                type=str(ev.get("type", "")),
+                seq=int(ev.get("seq", 0)),
+                time=float(ev.get("time", 0.0)),
+                data=ev.get("data") if isinstance(ev.get("data"), dict) else {},
+                session_id=binding.session_id,
+                raw=ev,
+            )
+            text = render_session_event(event, include_time=True)
+            if text:
+                lines.append(text)
+        if len(lines) == 1:
+            lines.append("(暂无记录)")
+        await self._send(
+            message.channel,
+            message.conversation_id,
+            truncate("\n".join(lines), self.max_message_chars),
+        )
 
     async def _cmd_approval(self, message: InboundMessage, key: str, outcome: str) -> None:
         pending = self._first_pending(key, "approval")
@@ -649,3 +729,61 @@ def parse_answer_arg(arg: str, questions=None) -> Optional[list]:
                 continue
         answers.append({"id": qid, "selected": [], "custom": value})
     return answers or None
+
+
+def find_missed_questions(events: list) -> list:
+    """Detect ``ask_user_question`` tool calls in a history window that were
+    never answered (no matching tool result).
+
+    Real dsh does not re-broadcast a pending question after the bridge
+    reconnects, so an unanswered one is stuck on the host. Returns a list of
+    dicts ``{"call_id", "questions", "text"}`` so the hub can alert the user.
+    """
+    tool_results = set()
+    for entry in events:
+        ev = entry.get("event") if isinstance(entry, dict) else None
+        if not isinstance(ev, dict):
+            continue
+        if ev.get("type") == "tool/result":
+            data = ev.get("data") or {}
+            if isinstance(data.get("callId"), str):
+                tool_results.add(data["callId"])
+            msg = data.get("message") or {}
+            for block in (msg.get("content") or []):
+                if isinstance(block, dict) and block.get("type") == "tool-result":
+                    cid = block.get("toolCallId")
+                    if isinstance(cid, str):
+                        tool_results.add(cid)
+
+    missed = []
+    for entry in events:
+        ev = entry.get("event") if isinstance(entry, dict) else None
+        if not isinstance(ev, dict) or ev.get("type") != "tool/call":
+            continue
+        data = ev.get("data") or {}
+        if data.get("name") != "ask_user_question":
+            continue
+        call_id = data.get("callId")
+        if call_id in tool_results:
+            continue
+        questions = ()
+        try:
+            args = json.loads(data.get("arguments") or "{}")
+            questions = tuple(
+                QuestionItem.from_raw(q) for q in (args.get("questions") or [])
+            )
+        except json.JSONDecodeError:
+            questions = ()
+        if not questions:
+            continue
+        from .events import QuestionRequest
+
+        q = QuestionRequest(rpc_id="", session_id="", questions=questions, raw={})
+        missed.append(
+            {
+                "call_id": call_id,
+                "questions": questions,
+                "text": render_question(q),
+            }
+        )
+    return missed

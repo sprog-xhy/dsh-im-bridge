@@ -223,10 +223,10 @@ class FeishuChannel(Channel):
         message = event.get("event", {}).get("message") or {}
         sender = event.get("event", {}).get("sender") or {}
         chat = message.get("chat") or {}
-        chat_type = chat.get("chat_type")
+        chat_type = chat.get("chat_type") or message.get("chat_type")
         if chat_type not in self.receive_chat_types:
             return
-        chat_id = chat.get("chat_id") or chat.get("id") or ""
+        chat_id = chat.get("chat_id") or message.get("chat_id") or chat.get("id") or ""
         content = message.get("content") or "{}"
         try:
             content_obj = json.loads(content)
