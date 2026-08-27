@@ -104,7 +104,33 @@ def _env(name: str, default: str = "") -> str:
     return os.environ.get(f"DSH_IM_BRIDGE_{name}", default)
 
 
+def load_dotenv(path: Optional[str] = None) -> None:
+    """Load a simple ``.env`` file into the environment (without overriding).
+
+    Tiny dependency-free parser: lines ``KEY=VALUE``, ``#`` comments, blank
+    lines ignored. Existing environment variables take precedence. Falls back
+    to ``<cwd>/.env`` when no path is given.
+    """
+    target = path if path is not None else os.path.join(os.getcwd(), ".env")
+    if not os.path.isfile(target):
+        return
+    try:
+        with open(target, encoding="utf-8-sig") as fh:
+            for raw in fh:
+                line = raw.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, _, value = line.partition("=")
+                key = key.strip()
+                value = value.strip().strip("'\"")
+                if key and key not in os.environ:
+                    os.environ[key] = value
+    except OSError:
+        pass
+
+
 def load_config(path: Optional[str] = None) -> Config:
+    load_dotenv()
     data = _merge(DEFAULT_CONFIG, {})
     if path:
         if yaml is None:

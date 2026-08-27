@@ -22,6 +22,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--dsh", default=None, help="dsh web base URL (overrides config)")
     p.add_argument("--api-port", type=int, default=None, help="bridge management API port")
     p.add_argument("--verbose", action="store_true", help="debug logging")
+    p.add_argument("--log-file", default=None, help="also append logs to this file (useful for hidden Windows service runs)")
     p.add_argument("--data-dir", default=None, help="directory for bridge state (default: <cwd>/.dsh-im-bridge)")
     p.add_argument("--check", action="store_true", help="run self-diagnostics and exit (no server)")
     return p
@@ -208,8 +209,7 @@ def main(argv: list | None = None) -> int:
             stream.reconfigure(encoding="utf-8", errors="replace")
         except Exception:  # noqa: BLE001
             pass
-    if args.verbose:
-        logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)-7s %(name)s: %(message)s")
+    _configure_logging(args)
     try:
         if args.check:
             config = load_config(args.config)
@@ -219,6 +219,21 @@ def main(argv: list | None = None) -> int:
         return asyncio.run(_amain(args))
     except KeyboardInterrupt:
         return 0
+
+
+def _configure_logging(args) -> None:
+    handlers = [logging.StreamHandler()]
+    if args.log_file:
+        try:
+            Path(args.log_file).parent.mkdir(parents=True, exist_ok=True)
+            handlers.append(logging.FileHandler(args.log_file, encoding="utf-8"))
+        except OSError as exc:  # pragma: no cover - filesystem dependent
+            print(f"warning: cannot open log file {args.log_file!r}: {exc}", file=sys.stderr)
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.INFO,
+        format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
+        handlers=handlers,
+    )
 
 
 if __name__ == "__main__":

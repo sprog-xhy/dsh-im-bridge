@@ -27,15 +27,16 @@ if (-not (Test-Path "$Root\config.yaml")) {
 }
 
 $ScriptPath = "$Root\scripts\run_bridge.ps1"
+$LogFile = "$Root\bridge.log"
 $Action = New-ScheduledTaskAction -Execute "powershell.exe" `
-  -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$ScriptPath`" --config `"$Root\config.yaml`""
+  -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$ScriptPath`" --config `"$Root\config.yaml`" --log-file `"$LogFile`""
 $Trigger = New-ScheduledTaskTrigger -AtLogOn
 $Settings = New-ScheduledTaskSettingsSet -RestartCount 5 -RestartInterval (New-TimeSpan -Minutes 1)
 
 Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger `
   -Settings $Settings -Description "dsh-im-bridge: DeepSeek Harness <-> IM bridge" -Force | Out-Null
 
-Write-Host "[install] scheduled task '$TaskName' registered (runs at logon)."
+Write-Host "[install] scheduled task '$TaskName' registered (runs at logon, logs -> $LogFile)."
 Write-Host "  Start now:     Start-ScheduledTask -TaskName $TaskName"
-Write-Host "  View logs:     Get-ScheduledTask -TaskName $TaskName"
+Write-Host "  View logs:     Get-Content $LogFile -Tail 50"
 Write-Host "  Remove:        re-run with -Unregister"
