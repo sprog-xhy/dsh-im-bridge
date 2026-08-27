@@ -134,6 +134,7 @@ powershell -ExecutionPolicy Bypass -File scripts\install-windows-task.ps1
 |---|---|
 | `GET /health` | 存活检查 |
 | `GET /status` | dsh + 通道 + 绑定 + 待确认列表 |
+| `GET /attachment?sessionId=..&attachmentId=..` | 取回会话图片(base64) |
 | `POST /prompt` | `{"sessionId": "...", "text": "..."}` 直接发提示 |
 | `POST /message` | `{"channel": "webhook", "conversation_id": "x", "text": "..."}` 经某通道注入 |
 | `POST /answer` | `{"channel","conversation_id","text":"1:选项A,2:自定义"}` 回答待确认问题 |
@@ -145,8 +146,19 @@ powershell -ExecutionPolicy Bypass -File scripts\install-windows-task.ps1
 ## 开发 & 测试
 
 ```bash
-python -m pytest -q        # 34 个单测(不依赖真实网络/账号)
+python -m pytest -q        # 68 个单测(不依赖真实网络/账号)
 ```
+
+### 图片/附件
+
+agent 消息里带图时, IM 文本会显示 `[图片: 名字]` + `📎 附件 [attachmentId=...]` 提示。取回真实图片:
+
+```bash
+python scripts/fetch_attachment.py <sessionId> <attachmentId> -o out.png
+# 或经桥接 API: GET http://127.0.0.1:8764/attachment?sessionId=..&attachmentId=..
+```
+
+> 飞书/QQ 通道的图片上传(im/v1/images / OneBot image)等拿到真账号后接入。
 
 测试覆盖: 线协议解析、DshClient(unary/respond/mux 重连)、Hub 路由(自动绑定、事件转发、问题/审批应答、指令、状态持久化)、QQ OneBot 收发、webhook HTTP。
 

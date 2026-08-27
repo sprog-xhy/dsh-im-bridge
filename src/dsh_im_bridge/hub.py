@@ -36,6 +36,7 @@ from .formatter import (
     STEP_END,
     TURN_END,
     answer_help_text,
+    attachment_hint,
     render_approval,
     render_question,
     render_session_event,
@@ -351,6 +352,10 @@ class BridgeHub:
         text = render_session_event(event)
         if not text:
             return
+        if event.type in ("assistant/message", "user/message"):
+            hint = attachment_hint(event)
+            if hint:
+                text += hint
         text = truncate(text, self.max_message_chars)
         for key in list(keys):
             channel_name, conversation_id = self._split_key(key)

@@ -88,3 +88,57 @@ def test_truncate():
 def test_events_model_text_of_content_list():
     ev = _ev("user/message", "", extra={"content": [{"type": "text", "text": "hi"}]})
     assert ev.text == "hi"
+
+
+def test_extract_attachments():
+    from dsh_im_bridge.events import extract_attachments
+
+    content = [
+        {"type": "text", "text": "hi"},
+        {"type": "image", "attachmentId": "att-1", "mediaType": "image/png", "name": "plot.png"},
+        {"type": "image", "attachment": {"attachmentId": "att-2"}},
+        {"type": "image"},  # no id -> skipped
+    ]
+    refs = extract_attachments(content)
+    assert [r.attachment_id for r in refs] == ["att-1", "att-2"]
+    assert refs[0].name == "plot.png"
+    assert refs[0].media_type == "image/png"
+
+
+def test_image_block_rendering():
+    ev = _ev(
+        "assistant/message",
+        "",
+        extra={
+            "message": {
+                "content": [
+                    {"type": "text", "text": "这是结果"},
+                    {"type": "image", "attachmentId": "att-9", "name": "chart.png"},
+                ]
+            }
+        },
+    )
+    assert ev.text == "这是结果\n[图片: chart.png]"
+
+
+def test_attachment_hint():
+    from dsh_im_bridge.formatter import attachment_hint
+
+    ev = _ev(
+        "assistant/message",
+        "",
+        extra={
+            "message": {
+                "content": [
+                    {"type": "text", "text": "结果"},
+                    {"type": "image", "attachmentId": "att-9", "name": "chart.png"},
+                ]
+            }
+        },
+    )
+    hint = attachment_hint(ev)
+    assert "chart.png" in hint
+    assert "att-9" in hint
+
+    plain = _ev("assistant/message", "no image")
+    assert attachment_hint(plain) == ""

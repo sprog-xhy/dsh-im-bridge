@@ -153,6 +153,17 @@ class DshClient:
     def cancel(self, session_id: str) -> dict:
         return self.call("session.cancel", {"sessionId": session_id})
 
+    def attachment(self, session_id: str, attachment_id: str) -> dict:
+        """Download one session attachment.
+
+        Returns ``{"attachment": {attachmentId, mediaType, bytes, width, height, name?},
+        "data": <base64>}`` — see the dsh ``session.attachment`` API.
+        """
+        return self.call(
+            "session.attachment",
+            {"sessionId": session_id, "attachmentId": attachment_id},
+        )
+
     def history(self, session_id: str, max_messages: int = 50, before_seq: Optional[int] = None) -> dict:
         payload: dict = {"sessionId": session_id, "maxMessages": max_messages}
         if before_seq is not None:

@@ -11,7 +11,7 @@ from __future__ import annotations
 import datetime as _dt
 from typing import Optional
 
-from .events import ApprovalRequest, QuestionRequest, SessionEvent, text_of
+from .events import ApprovalRequest, QuestionRequest, SessionEvent, extract_attachments, text_of
 
 # Event types that represent the agent actually saying something to the user.
 FINAL_MESSAGE_EVENTS = frozenset(
@@ -138,6 +138,22 @@ def answer_help_text() -> str:
         "  /cancel         中断当前绑定的 dsh 会话（例如它卡在等待确认上）\n"
         "  /history [N]    拉取绑定会话最近 N 条记录\n"
     )
+
+
+def attachment_hint(event: SessionEvent) -> str:
+    """Compact note about image attachments carried by a message event.
+
+    Real channel adapters should upload the image natively; until then this
+    hint tells the user the image exists and how to fetch it (bridge API).
+    """
+    refs = extract_attachments(event.data)
+    if not refs:
+        return ""
+    lines = []
+    for ref in refs:
+        name = ref.name or "image"
+        lines.append(f"📎 {name} [attachmentId={ref.attachment_id}]")
+    return "\n" + "\n".join(lines)
 
 
 def truncate(text: str, max_chars: int = 2000) -> str:

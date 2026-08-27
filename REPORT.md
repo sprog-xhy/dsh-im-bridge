@@ -223,4 +223,30 @@ WOA 定义 / 飞书用哪种机器人 / QQ 用哪个 OneBot / 默认工作区 / 
 
 ---
 
+# 开发报告 (第 5 轮) — 图片/附件支持
+
+## 本轮新增(测试 68 个)
+
+1. **图片/附件支持** — 之前 agent 消息里带图只显示 `[图片]` 占位。本轮打通:
+   - `session.attachment` 客户端方法 + `extract_attachments`/`AttachmentRef`(解析 content 里的 image 块);
+   - IM 文本显示 `[图片: 名字]`, 并追加 `📎 附件 [attachmentId=...]` 提示;
+   - 桥接 API 新增 `GET /attachment?sessionId=..&attachmentId=..` 取回图片(base64);
+   - `scripts/fetch_attachment.py <sessionId> <attachmentId> -o out.png` 一键落盘。
+2. 修了一个路由 bug: 带 query 的 GET(`/attachment?x=1`)之前匹配不到路由, 已改为按去掉 query 的路径匹配。
+3. 测试 63 → **68 个**(覆盖 attachment 客户端/解析/渲染/路由)。
+
+> 飞书/QQ 通道的图片上传(im/v1/images / OneBot image)等拿到真账号后接入; 桥接层已就绪。
+
+## 第 5 轮实测结果
+
+- ✅ 68/68 单测通过
+- ✅ `/attachment` 路由对真实 dsh 的 `session.attachment` 协议实现(单测锁定)
+- ⚠️ 真实图片附件联调需等真账号(本机测试会话里没有 agent 生成的图)
+
+## 仍待你拍板(不变)
+
+WOA 定义 / 飞书用哪种机器人 / QQ 用哪个 OneBot / 默认工作区 / 通知策略 / 常驻方式 / 管理 API 是否外露 —— 见第 1 轮第 5 节。
+
+---
+
 祝睡个好觉 🌙 明天见。

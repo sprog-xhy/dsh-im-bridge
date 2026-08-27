@@ -54,20 +54,25 @@ class BridgeServer:
             self._server = None
 
     async def _route(self, path: str, method: str, payload: dict) -> dict:
+        from urllib.parse import urlparse
+
+        route_path = urlparse(path).path  # strip query string for matching
         try:
-            if path == "/health" and method == "GET":
+            if route_path == "/health" and method == "GET":
                 return {"ok": True}
-            if path == "/status" and method == "GET":
+            if route_path == "/status" and method == "GET":
                 return await self._status()
-            if path == "/prompt" and method == "POST":
+            if route_path == "/attachment" and method == "GET":
+                return await self._attachment(path)
+            if route_path == "/prompt" and method == "POST":
                 return await self._prompt(payload)
-            if path == "/message" and method == "POST":
+            if route_path == "/message" and method == "POST":
                 return await self._message(payload)
-            if path == "/answer" and method == "POST":
+            if route_path == "/answer" and method == "POST":
                 return await self._answer(payload)
-            if path == "/approval" and method == "POST":
+            if route_path == "/approval" and method == "POST":
                 return await self._approval(payload)
-            if path == "/bind" and method == "POST":
+            if route_path == "/bind" and method == "POST":
                 return await self._bind(payload)
             return {"error": f"unknown route {method} {path}", "accepted": False}
         except DshError as exc:
@@ -91,6 +96,37 @@ class BridgeServer:
                 {"rpcId": rid, "kind": e["kind"], "sessionId": e["session_id"]}
                 for rid, e in self.hub.pending.items()
             ],
+        }
+
+    async def _attachment(self, path: str) -> dict:
+        """GET /attachment?sessionId=...&attachmentId=... -> image payload.
+
+        Returns the attachment metadata plus the image bytes base64-encoded, so
+        any channel adapter / external tool can fetch and forward the image
+        (Feishu/QQ upload is a per-channel step once credentials exist).
+        """
+        from urllib.parse import parse_qs, urlparse
+
+        qs = parse_qs(urlparse(path).query)
+        session_id = (qs.get("sessionId") or [""])[0]
+        attachment_id = (qs.get("attachmentId") or [""])[0]
+        if not session_id or not attachment_id:
+            return {"ok": False, "error": "sessionId and attachmentId query params required"}
+        value = self.hub.client.attachment(session_id, attachment_id)
+        attachment = value.get("attachment") or {}
+        data = value.get("data") or ""
+        return {
+            "ok": True,
+            "sessionId": session_id,
+            "attachment": {
+                "attachmentId": attachment.get("attachmentId", attachment_id),
+                "mediaType": attachment.get("mediaType", "image/png"),
+                "bytes": attachment.get("bytes"),
+                "width": attachment.get("width"),
+                "height": attachment.get("height"),
+                "name": attachment.get("name", ""),
+                "dataBase64": data,
+            },
         }
 
     async def _prompt(self, payload: dict) -> dict:

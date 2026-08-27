@@ -68,6 +68,17 @@ def fake_api():
         "session.prompt": {"accepted": True},
         "session.cancel": {"accepted": True},
         "session.history": {"events": [], "hasMore": False},
+        "session.attachment": {
+            "attachment": {
+                "attachmentId": "att-1",
+                "mediaType": "image/png",
+                "bytes": 4,
+                "width": 2,
+                "height": 2,
+                "name": "plot.png",
+            },
+            "data": "iVBORw0KGgo=",
+        },
     }
     srv = ThreadingHTTPServer(("127.0.0.1", 0), handler)
     thread = threading.Thread(target=srv.serve_forever, daemon=True)
@@ -82,6 +93,13 @@ def test_call_unary(fake_api):
     assert client.describe()["version"] == "0.0.1"
     assert client.list_sessions()[0]["sessionId"] == "s-1"
     assert client.create_session()["sessionId"] == "s-new"
+
+
+def test_attachment(fake_api):
+    client = DshClient(base_url=f"http://127.0.0.1:{fake_api}")
+    value = client.attachment("s-1", "att-1")
+    assert value["attachment"]["name"] == "plot.png"
+    assert value["data"] == "iVBORw0KGgo="
 
 
 def test_prompt_payload(fake_api):

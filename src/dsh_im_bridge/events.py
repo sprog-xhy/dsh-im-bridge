@@ -26,6 +26,66 @@ class ContentBlock:
         return cls(type="unknown", text=str(raw))
 
 
+@dataclasses.dataclass(frozen=True)
+class AttachmentRef:
+    """A reference to a dsh session attachment (usually an image)."""
+
+    attachment_id: str
+    media_type: str = "image/png"
+    name: str = ""
+    width: Optional[int] = None
+    height: Optional[int] = None
+
+    @classmethod
+    def from_block(cls, block: dict) -> Optional["AttachmentRef"]:
+        """Extract an AttachmentRef from an image content block, if it has an id."""
+        if not isinstance(block, dict) or block.get("type") != "image":
+            return None
+        attachment_id = block.get("attachmentId") or block.get("attachment_id")
+        if not attachment_id:
+            nested = block.get("attachment") or block.get("image")
+            if isinstance(nested, dict):
+                attachment_id = nested.get("attachmentId") or nested.get("id")
+        if not attachment_id:
+            return None
+        meta = block.get("attachment") if isinstance(block.get("attachment"), dict) else {}
+        return cls(
+            attachment_id=str(attachment_id),
+            media_type=str(meta.get("mediaType") or block.get("mediaType") or "image/png"),
+            name=str(meta.get("name") or block.get("name") or ""),
+            width=meta.get("width") or block.get("width"),
+            height=meta.get("height") or block.get("height"),
+        )
+
+
+def extract_attachments(content: Any) -> list:
+    """Walk a message content value and return all image attachment refs.
+
+    Handles the same wire shapes as :func:`text_of` (content list, message
+    wrapper, …).
+    """
+    found: list = []
+    if isinstance(content, str):
+        return found
+    if isinstance(content, dict):
+        if isinstance(content.get("message"), (dict, list)):
+            return extract_attachments(content["message"])
+        if "content" in content:
+            return extract_attachments(content["content"])
+        return found
+    if isinstance(content, (list, tuple)):
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") == "image":
+                ref = AttachmentRef.from_block(block)
+                if ref is not None:
+                    found.append(ref)
+            elif block.get("type") == "tool-result":
+                found.extend(extract_attachments(block.get("content")))
+    return found
+
+
 def text_of(content: Any, *, include_reasoning: bool = True) -> str:
     """Join the textual content of a message content value.
 
@@ -62,7 +122,11 @@ def text_of(content: Any, *, include_reasoning: bool = True) -> str:
                     if inner:
                         parts.append(inner)
                 elif block.get("type") == "image":
-                    parts.append("[image]")
+                    ref = AttachmentRef.from_block(block)
+                    if ref is not None and ref.name:
+                        parts.append(f"[图片: {ref.name}]")
+                    else:
+                        parts.append("[图片]")
             else:
                 parts.append(str(block))
         return "\n".join(p for p in parts if p)

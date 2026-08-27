@@ -47,6 +47,19 @@ class FakeDsh:
     def history(self, session_id, max_messages=50, before_seq=None):
         return {"events": [], "hasMore": False}
 
+    def attachment(self, session_id, attachment_id):
+        return {
+            "attachment": {
+                "attachmentId": attachment_id,
+                "mediaType": "image/png",
+                "bytes": 4,
+                "width": 2,
+                "height": 2,
+                "name": "plot.png",
+            },
+            "data": "aGVsbG8=",
+        }
+
     def cancel(self, session_id):
         pass
 
@@ -171,6 +184,27 @@ async def test_server_answer_and_approval():
         )
         assert res["accepted"] is True
         assert dsh.approvals == [("ra-1", "s-1", "a-1", "allowed-once")]
+    finally:
+        await server.stop()
+
+
+@pytest.mark.asyncio
+async def test_server_attachment():
+    dsh = FakeDsh()
+    hub = BridgeHub(dsh, catch_up=False)
+    server = BridgeServer(hub, port=0)
+    await server.start()
+    port = server.bound_port
+    try:
+        res = await _http_in_thread(
+            port, "/attachment?sessionId=s-1&attachmentId=att-1", "GET"
+        )
+        assert res["ok"] is True
+        assert res["attachment"]["name"] == "plot.png"
+        assert res["attachment"]["dataBase64"] == "aGVsbG8="
+
+        bad = await _http_in_thread(port, "/attachment?sessionId=s-1", "GET")
+        assert bad["ok"] is False
     finally:
         await server.stop()
 
