@@ -645,7 +645,8 @@ class BridgeHub:
         if path is None or not path.exists():
             return
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
+            # utf-8-sig tolerates a UTF-8 BOM (PowerShell's Set-Content writes one)
+            data = json.loads(path.read_text(encoding="utf-8-sig"))
             for row in data.get("bindings", []):
                 binding = SessionBinding.from_dict(row)
                 if binding.conversation_key and binding.session_id:

@@ -277,6 +277,20 @@ async def test_state_persistence(hub):
         assert h3.bindings["rec:c1"].session_id == "s-7"
 
 
+def test_state_load_tolerates_utf8_bom():
+    """PowerShell's Set-Content writes a UTF-8 BOM; loading must not crash."""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        state = Path(tmp) / "state.json"
+        state.write_bytes(
+            b"\xef\xbb\xbf" + b'{"bindings":[{"conversation":"rec:c1","sessionId":"s-1","title":""}],"notifiedSeq":{}}'
+        )
+        h = BridgeHub(FakeDsh(), state_file=state)
+        h._load_state()
+        assert h.bindings["rec:c1"].session_id == "s-1"
+
+
 def test_parse_answer_arg():
     assert parse_answer_arg("1:是") == [{"id": "1", "selected": [], "custom": "是"}]
     assert parse_answer_arg("1:是,2:随便") == [

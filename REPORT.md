@@ -143,10 +143,10 @@ pending 数 -> 0
 
 这个过程中还**修掉了一个真 bug**: 之前 `/answer 1:选项A` 把"1"当成问题 id 提交, 真实 dsh 会拒绝(`accepted: false`)——因为真实问题的 id 是随机的字符串, 不是数字。现在 `/answer` 会用 1-based 序号解析到**真实的问题 id**, 选项文字匹配 `selected`, 其余走 `custom`。已加单测。
 
-## 第 2 轮发现的两个新问题(都已在报告里留档)
+## 第 2 轮发现的两个新问题(都在第 3 轮验证/修正)
 
-1. **真实 dsh 不会在桥接重启后重放"未答复的问题"**: 之前 fixture 注释说的"stable rpcId replay"只存在于测试夹具里。真实行为是: 桥接断线期间 agent 问的问题, 重连后**收不到**, 那个 `ask_user_question` 会一直卡住等不到答复。→ 建议: 重启后从 `session.history` 里识别未完成的 `tool/call`(ask_user_question)并提示你, 或者干脆让桥接常驻不重启(已提供 systemd/计划任务)。
-2. **PowerShell 的 `Invoke-RestMethod` 会把中文发成 `????`**(它按 ASCII 编码 JSON 体), 这会让 agent 看到乱码而去反问——正好帮我意外验证了问题流程, 但也说明**注入中文消息请用 curl/Python**(README 已注明)。
+1. ~~真实 dsh 不会在桥接重启后重放"未答复的问题"~~ **已推翻(第 3 轮实证)**: 真实 dsh **会**在 mux 重连时重放未答复的问题, 前提是**会话在连接时刻已绑定**。第 2 轮的"没收到"其实是测试时序问题(绑定建在 mux 连接之后, 问题先到、当时未绑定被丢弃)。第 3 轮已实测: 带绑定重启 → 问题被重新捕获(pending=1) → `/answer` 应答被真实 dsh 接受 → 解除。**真正的边界情况**: 问题到达时会话未绑定, 才会被丢弃(此时本来也没人能答)。因此桥接最好保持常驻, 且绑定应先于连接建立(正常启动顺序 `load_state → mux connect` 已保证)。
+2. **PowerShell 的 `Invoke-RestMethod` 会把中文发成 `????`**(它按 ASCII 编码 JSON 体), 这会让 agent 看到乱码而去反问——正好帮我意外验证了问题流程, 但也说明**注入中文消息请用 curl/Python**(README 已注明)。另外 PowerShell `Set-Content -Encoding UTF8` 写文件带 BOM, 桥接读取状态文件已改为容忍 BOM(`utf-8-sig`)。
 
 ## 仍待你拍板(同第 1 轮第 5 节, 未变)
 
@@ -164,22 +164,38 @@ pending 数 -> 0
 
 # 开发报告 (第 3 轮) — 健壮性补强
 
-## 本轮新增(全部有测试, 测试 52 个)
+## 本轮新增(全部有测试, 测试 53 个)
 
-1. **停机期间"未答复确认请求"的检测与提醒** — 针对第 2 轮发现"dsh 重启后不重放未答复问题"的补强: 桥接重启做 catch-up 时, 会扫描 `session.history` 里 `ask_user_question` 的 `tool/call`(用真实 callId 数据验证过), 若没有对应的 `tool/result`, 说明那是停机期间漏掉的确认请求、还在 dsh 侧挂起, 会主动推给你: "⚠️ 检测到桥接离线期间的未答复确认请求…可 /cancel 中断该会话或 /history 查看上下文"。
-2. **`/cancel` 指令** — 中断当前绑定的 dsh 会话(专门用来处理上面那种卡在等待确认的会话); `/cancel-question` 保留为取消当前待确认问题。
-3. **`/history [N]` 指令** — 把绑定会话最近 N 条记录拉进 IM, 方便停机后快速补上下文。
+1. **重启后"未答复确认请求"的兜底提醒** — 第 2 轮曾以为 dsh 不重放未答复问题, 第 3 轮实证**它其实会重放**(见下), 所以兜底检测主要用于真正的边界: 问题到达时会话未绑定(比如还没绑定的会话)。桥接重启做 catch-up 时扫描 `session.history` 里的 `ask_user_question` `tool/call`(用真实 callId 数据验证), 若无对应 `tool/result` 且会话已绑定, 会主动提醒"⚠️ 检测到未答复确认请求…可 /cancel 中断或 /history 查看"。
+2. **`/cancel` 指令** — 中断当前绑定的 dsh 会话; `/cancel-question` 保留为取消当前待确认问题。
+3. **`/history [N]` 指令** — 把绑定会话最近 N 条记录拉进 IM。
 4. **飞书加密与收包路径的单测**(此前完全没测过):
    - AES-256-CBC(Feishu 格式: sha256(encryptKey) 作密钥、前 16 字节作 IV、PKCS7)往返解密 ✅;
    - `im.message.receive_v1` 事件 → InboundMessage 映射(chat_id/chat_type、`@_user_1` 清洗、chat 类型白名单)✅。
    - **顺带修了一个真 bug**: 飞书事件里 `chat_id`/`chat_type` 直接在 message 对象上, 我原来错误地按 `message.chat` 取, 会导致飞书消息收不到。已修 + 测试锁定。
-5. `cryptography` 列为 `[feishu]` 可选依赖(只有飞书开 encryptKey 才需要)。
+5. **状态文件容忍 UTF-8 BOM** — PowerShell `Set-Content -Encoding UTF8` 写出的状态文件带 BOM, 之前会导致加载失败; 现用 `utf-8-sig` 读取。加测试。
+6. `cryptography` 列为 `[feishu]` 可选依赖(只有飞书开 encryptKey 才需要)。
+
+## 🎯 第 3 轮最重要的实测: 重启后"未答复问题"能被重新捕获并应答
+
+针对第 2 轮的疑问, 这次用一个真实挂起的问题(agent 之前问的、一直没答)做了完整验证:
+
+```
+1. 桥接带绑定 + 进度水印重启
+2. mux 连接后, dsh 把未答复的问题重新推给桥接   →  log: question/requested 捕获
+3. /status → pending: 1                          ← 问题被桥接重新捕获
+4. POST /api/answer → {"accepted": true}         ← 真实 dsh 接受
+5. /status → pending: 0                          ← 问题解除, agent 可继续
+```
+
+结论修正: **dsh 会在 mux 重连时重放未答复的问题**(前提: 会话在连接时刻已绑定)。第 2 轮说的"不重放"是测试时序误判。
 
 ## 第 3 轮实测结果
 
-- ✅ 52/52 单测通过
-- ✅ 用真实 dsh 的 `tool/call`(ask_user_question)数据结构验证了"未答复确认请求"检测逻辑
-- ✅ 飞书加密/收包在无账号的情况下通过单测验证(联调仍需真账号)
+- ✅ 53/53 单测通过
+- ✅ 真实 dsh 上验证"重启 → 重新捕获未答复问题 → /answer 应答 → 解除"全链路
+- ✅ 用真实 dsh 的 `tool/call`(ask_user_question)数据结构验证了兜底检测
+- ✅ 飞书加密/收包在无账号的情况下通过单测(联调仍需真账号)
 
 ## 仍待你拍板(不变)
 
