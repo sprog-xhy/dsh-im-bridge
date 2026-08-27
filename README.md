@@ -88,6 +88,8 @@ curl -X POST http://127.0.0.1:8765/message \
   -d '{"text": "帮我写一个 hello.py 并运行"}'
 ```
 
+> ⚠️ 注入中文请用 curl/Python(UTF-8)。**Windows PowerShell 的 `Invoke-RestMethod` 会按 ASCII 编码 JSON 体, 把中文变成 `????`**, 导致 agent 看到乱码。
+
 通知会打印在桥接进程的 stdout 上。
 
 ### 对真实 dsh 的端到端自测

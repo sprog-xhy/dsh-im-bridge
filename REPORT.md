@@ -125,7 +125,28 @@ OK
 - ✅ 42/42 单测通过(`python -m pytest -q`)
 - ✅ 确认流程 demo 全链路跑通(见上)
 - ✅ 真实 dsh 端到端再验证(建会话→prompt→OK→turn/end 通知), 且已把 agent 的"思考过程"从通知里剔除, 只显示最终回答
+- ✅ **真实 dsh 上完成了完整的"问题确认"往返**(见下, 这是本程序最核心的场景)
 - ✅ git 首版已提交
+
+## 🎯 最重要的实测: 真实 dsh 上的"需要你确认"往返
+
+第 2 轮里, 真实 dsh 的 agent 真的一次 `ask_user_question` 提问, 桥接程序把它捕获并推给通道, 我用 `/answer` 应答后 agent 继续并 `turn/end`:
+
+```
+(agent 收到消息后主动提问)
+❓ **需要你确认**
+...
+POST /api/answer  ->  {"accepted": true}     ← 真实 dsh 接受了答案
+(agent 继续) assistant/message -> turn/end
+pending 数 -> 0
+```
+
+这个过程中还**修掉了一个真 bug**: 之前 `/answer 1:选项A` 把"1"当成问题 id 提交, 真实 dsh 会拒绝(`accepted: false`)——因为真实问题的 id 是随机的字符串, 不是数字。现在 `/answer` 会用 1-based 序号解析到**真实的问题 id**, 选项文字匹配 `selected`, 其余走 `custom`。已加单测。
+
+## 第 2 轮发现的两个新问题(都已在报告里留档)
+
+1. **真实 dsh 不会在桥接重启后重放"未答复的问题"**: 之前 fixture 注释说的"stable rpcId replay"只存在于测试夹具里。真实行为是: 桥接断线期间 agent 问的问题, 重连后**收不到**, 那个 `ask_user_question` 会一直卡住等不到答复。→ 建议: 重启后从 `session.history` 里识别未完成的 `tool/call`(ask_user_question)并提示你, 或者干脆让桥接常驻不重启(已提供 systemd/计划任务)。
+2. **PowerShell 的 `Invoke-RestMethod` 会把中文发成 `????`**(它按 ASCII 编码 JSON 体), 这会让 agent 看到乱码而去反问——正好帮我意外验证了问题流程, 但也说明**注入中文消息请用 curl/Python**(README 已注明)。
 
 ## 仍待你拍板(同第 1 轮第 5 节, 未变)
 
