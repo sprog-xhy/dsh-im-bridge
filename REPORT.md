@@ -2,6 +2,8 @@
 
 **程序已经开发完成并在你机器上通过全部验证**（在 `D:\mycode\python\local-dev\dsh-im-bridge`）。当前联调目标：**飞书 + QQ**（WOA/WPS 协作因需管理员审核已弃用）。
 
+> ✅ **2026-08-28 里程碑：飞书通道真实联调完成！** 应用机器人 `dsh连接飞书`（cli_aa1b2f74c538dbc4）已跑通：私聊机器人发消息 → dsh 执行 → 回复/完成通知推回飞书；首次绑定自动发欢迎语+指令列表。过程中修复了一个关键 bug：未配置 `forwardEvents` 时会退化成空集导致所有 dsh 回复被静默丢弃。
+
 **1) 验证一下环境（30 秒）**
 ```bash
 cd D:\mycode\python\local-dev\dsh-im-bridge
@@ -12,7 +14,7 @@ python scripts\verify_all.py --auto 4 --pytest   # Ubuntu 用 python3 scripts/ve
 **2) 提供凭据 / 拍板（回复给我即可）**
 > 最快方式：填 [CREDENTIALS.md](CREDENTIALS.md) 里的表，一次性发给我，我就把所有通道配好联调。
 
-- **飞书**（二选一）：A. 群里加"自定义机器人"给我 webhook URL（最快）；B. 在[飞书开放平台](https://open.feishu.cn/app)建应用、开 `im:message`/`im:message:send_as_bot`、事件订阅选长连接、加 `im.message.receive_v1`，给我 app_id/app_secret。
+- **飞书** ✅ 已联调完成（应用机器人 `dsh连接飞书`，双向收发正常）。
 - **QQ**：跑一个 OneBot11 协议端（NapCat 等，用 QQ 小号），开 WS 服务器模式，给我 WS 地址 + 机器人号。
 - **其余**：默认工作目录、通知策略（现在=最终回答+工具结果+完成+确认）、是否装常驻服务、管理 API 是否外露。
 
