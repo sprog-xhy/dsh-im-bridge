@@ -57,7 +57,7 @@ def main() -> int:
 
     print()
     if rc_pytest == 0 and rc1 == 0 and rc2 == 0:
-        print("✅ 全部通过：单测、环境、确认流程都 OK。可以配置飞书/QQ 通道了。")
+        print("✅ 全部通过：单测、环境、确认流程都 OK。可以配置飞书/QQ/WOA 通道了。")
         return 0
     print(f"❌ 存在问题：pytest={rc_pytest}, self-check={rc1}, demo={rc2}")
     print("   先跑 `python -m dsh_im_bridge --check` 看哪里标红。")
