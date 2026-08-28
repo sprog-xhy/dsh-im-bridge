@@ -9,7 +9,7 @@ Cross-platform: Windows + Ubuntu (Python ≥ 3.10). 已在 Windows 和 Ubuntu(WS
 
 > ⚠️ 部署提示: 桥接要和 dsh 在**同一系统/网络**里。若在 WSL(Ubuntu)里跑桥接、dsh 在 Windows, WSL 的 `127.0.0.1` 不是 Windows 的, 连不上——需开 WSL mirrored 网络或让 dsh 绑定非回环地址(见 REPORT.md 第 10 轮)。
 
-> ⚠️ 状态: 第一个可运行的版本已经完成并通过端到端实测（见 [REPORT.md](REPORT.md)）。
+> ⚠️ 状态: 第一个可运行的版本已经完成并通过端到端实测（见 [REPORT.md](REPORT.md)）。WOA 通道已按 WPS 协作协议实现（发送+HTTP 回调接收），待真实凭据联调。
 >
 > 📘 **飞书 / QQ / WOA 的逐步联调步骤见 [INTEGRATION.md](INTEGRATION.md)**（建飞书应用、跑 NapCat 等，跟着做就能通）。
 > 需要真实账号才能联调飞书/QQ 的完整收发；WOA 具体协议待确认。
@@ -45,7 +45,7 @@ Cross-platform: Windows + Ubuntu (Python ≥ 3.10). 已在 Windows 和 Ubuntu(WS
 | `channels/feishu.py` | 飞书: 自定义机器人 webhook(仅发送) + 应用机器人(收发, 事件长连接, AES 解密) |
 | `channels/qq.py` | QQ: OneBot11 反向 WebSocket(NapCat / Lagrange / LLOneBot / go-cqhttp) |
 | `channels/webhook.py` | 通用本地 HTTP 入站端点, 任何工具都能 POST 消息进来 |
-| `channels/woa.py` | WOA 占位(当前=通用 HTTP 端点), 待确认协议 |
+| `channels/woa.py` | WPS 协作 (WOA/WPS365): 发送(`/v7/messages/create`+KSO1 签名) + HTTP 回调接收(验签+AES 解密) |
 | `server.py` | 本地管理 HTTP API: `/status`(含待确认问题内容) `/prompt` `/message` `/answer` `/approval` `/bind` `/attachment` |
 
 ### 会话绑定

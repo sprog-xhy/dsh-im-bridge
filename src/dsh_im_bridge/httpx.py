@@ -16,7 +16,7 @@ from typing import Any, Awaitable, Callable, Optional
 
 log = logging.getLogger("dsh_im_bridge.http")
 
-Handler = Callable[[dict], Awaitable[Any]]
+Handler = Callable[..., Awaitable[Any]]
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -29,15 +29,17 @@ class _Handler(BaseHTTPRequestHandler):
         try:
             length = int(self.headers.get("Content-Length") or 0)
             body = self.rfile.read(length) if length else b""
+            raw_body = body.decode("utf-8", "replace")
             payload: Any = {}
             if body:
                 try:
-                    payload = json.loads(body.decode("utf-8"))
+                    payload = json.loads(raw_body)
                 except json.JSONDecodeError:
                     self._reply(400, {"error": "invalid JSON"})
                     return
             app: "MinimalHttpServer" = self.server.app  # type: ignore[attr-defined]
-            coro = app.route(self.path, self.command, payload)
+            headers = {k: v for k, v in self.headers.items()}
+            coro = app.route(self.path, self.command, payload, headers=headers, raw_body=raw_body)
             if asyncio.iscoroutine(coro):
                 fut = asyncio.run_coroutine_threadsafe(coro, app.loop)
                 result = fut.result(timeout=30)

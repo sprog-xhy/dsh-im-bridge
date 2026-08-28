@@ -52,7 +52,7 @@ class WebhookChannel(Channel):
         # to whoever polls. No-op by design.
         self.log.debug("webhook outbound (no push target): %s", text[:80])
 
-    async def _route(self, path: str, method: str, payload: dict) -> dict:
+    async def _route(self, path: str, method: str, payload: dict, **kwargs) -> dict:
         if path == "/health" and method == "GET":
             return {"ok": True}
         if path == "/message" and method == "POST":

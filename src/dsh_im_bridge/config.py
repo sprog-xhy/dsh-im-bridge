@@ -81,6 +81,11 @@ class Config:
         if self.channels.get("qq") and not self.channels["qq"].get("wsUrl"):
             errors.append("qq: wsUrl is required (OneBot11 reverse-WebSocket endpoint)")
 
+        woa = self.channels.get("woa") or {}
+        if woa:
+            if not woa.get("appId") or not woa.get("secretKey"):
+                errors.append("woa: appId and secretKey are required (WPS 开放平台应用)")
+
         if not self.channels:
             warnings.append("no channels enabled; only the bridge management API will run")
 
@@ -154,6 +159,11 @@ def load_config(path: Optional[str] = None) -> Config:
             elif name == "qq":
                 clone["wsUrl"] = _env("QQ_WS_URL", clone.get("wsUrl", "ws://127.0.0.1:3001"))
                 clone["accessToken"] = _env("QQ_ACCESS_TOKEN", clone.get("accessToken", "")) or None
+            elif name == "woa":
+                clone["appId"] = _env("WOA_APP_ID", clone.get("appId", "")) or None
+                clone["secretKey"] = _env("WOA_SECRET_KEY", clone.get("secretKey", "")) or None
+                clone["encryptKey"] = _env("WOA_ENCRYPT_KEY", clone.get("encryptKey", "")) or None
+                clone["apiUrl"] = _env("WOA_API_URL", clone.get("apiUrl", "https://openapi.wps.cn"))
             enabled_channels[name] = clone
 
     bridge = data.get("bridge") or {}

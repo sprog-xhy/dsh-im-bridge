@@ -53,7 +53,7 @@ class BridgeServer:
             await asyncio.to_thread(self._server.stop)
             self._server = None
 
-    async def _route(self, path: str, method: str, payload: dict) -> dict:
+    async def _route(self, path: str, method: str, payload: dict, **kwargs) -> dict:
         from urllib.parse import urlparse
 
         route_path = urlparse(path).path  # strip query string for matching

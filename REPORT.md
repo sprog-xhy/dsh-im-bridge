@@ -1,6 +1,6 @@
 # 📋 给明天睡醒的你（先看这里）
 
-**程序已经开发完成并在你机器上通过全部验证**（在 `D:\mycode\python\local-dev\dsh-im-bridge`）。你要做的就三件事：
+**程序已经开发完成并在你机器上通过全部验证**（在 `D:\mycode\python\local-dev\dsh-im-bridge`）。WOA = **WPS 协作** 已确认并实现（发送+HTTP 回调接收），现在只差真实凭据联调。
 
 **1) 验证一下环境（30 秒）**
 ```bash
@@ -9,21 +9,18 @@ python scripts\verify_all.py --auto 4 --pytest   # Ubuntu 用 python3 scripts/ve
 ```
 看到 "✅ 全部通过" 就说明程序在你机器上是好的。
 
-**2) 回答下面几个问题（回复给我即可）**
-1. **WOA 协作到底是什么？**（WPS 协作？企业微信？公司内部平台？目前用通用 HTTP 端点占位，说清楚我改适配器）
-2. **飞书**：用自定义机器人（仅收通知）还是应用机器人（能双向收发）？后者需要你在[飞书开放平台](https://open.feishu.cn/app)建应用，把 app_id / app_secret 给我。
-3. **QQ**：用哪个协议端（NapCat / Lagrange / LLOneBot / go-cqhttp）？方便挂一个 QQ 小号吗？
-4. **自动建会话的默认目录**：给个固定工作目录，比如 `D:\mycode\python\local-dev\dsh-im-bridge\workdir`？
-5. **通知策略**：现在是"最终回答 + 工具错误/有输出 + 任务完成 + 需要确认/审批"。要更安静（只发完成+确认）吗？
-6. **常驻方式**：装 Windows 登录自启任务 / Ubuntu systemd 服务，还是先手动跑？
-7. **管理 API**：默认只绑 127.0.0.1（本机）。要不要给别的机器用？
+**2) 提供凭据 / 拍板（回复给我即可）**
+- **WOA（WPS 协作）**：在 [WPS 开放平台](https://open.wps.cn/)（或 [jp-open.wps.com](https://jp-open.wps.com/)）建内部企业应用、开机器人消息能力、选 **HTTP 回调模式**，给我：**App ID**、**Secret Key**、Encrypt Key（若有）、**API 地址**（日本平台的实际 apiUrl）。还有：**回调地址怎么让 WPS 访问到**（公网 IP？内网穿透？）。
+- **飞书**：用自定义机器人（仅收通知）还是应用机器人（双向）？后者给我 app_id/app_secret。
+- **QQ**：用哪个协议端（NapCat 等）？WS 地址 + 机器人号。
+- **其余**：默认工作目录、通知策略（现在=最终回答+工具结果+完成+确认）、是否装常驻服务、管理 API 是否外露。
 
 **3) 联调真实通道（我拿到凭据后马上做）**
-配好凭据后照 `INTEGRATION.md` 操作，用 `--test-notify feishu` 发测试消息确认通道通了，然后就能"群里喊 dsh / 手机收完成通知 / 回复确认选择"。
+照 `INTEGRATION.md` 操作，用 `--test-notify feishu/qq/woa` 发测试消息确认通道通了，然后就能"群里/私聊喊 dsh、手机收完成通知、回复确认选择"。
 
 > 聊天里的快捷指令：`/help` `/status` `/sessions` `/attach <会话ID>` `/new` `/answer 1:选项` `/allow` `/reject` `/cancel` `/history`。
 
-详细开发过程见下方 1-21 轮报告。核心结论: 所有核心场景（任务完成通知、需要你确认、你主动发消息）都已在真实 dsh 上验证通过; 飞书/QQ 代码全路径有测试, 就差真实凭据联调。
+详细开发过程见下方 1-31 轮报告。核心结论: 所有核心场景（任务完成通知、需要你确认、你主动发消息）都已在真实 dsh 上验证通过; 飞书/QQ/WOA 代码全路径有测试, 就差真实凭据联调。
 
 ---
 
@@ -611,6 +608,40 @@ WOA 定义 / 飞书用哪种机器人 / QQ 用哪个 OneBot / 默认工作区 / 
 ## 仍待你拍板(不变)
 
 WOA 定义 / 飞书用哪种机器人 / QQ 用哪个 OneBot / 默认工作区 / 通知策略 / 常驻方式 / 管理 API 是否外露 —— 见第 1 轮第 5 节。
+
+---
+
+# 开发报告 (第 31 轮) — WOA(WPS 协作)通道开发 ✅
+
+> 你确认了 WOA = **WPS 协作 (WPS365)**，文档在 jp-open.wps.com。本轮已把 WOA 通道从占位改成真实实现。
+
+## 本轮新增(测试 85 → **98 个**)
+
+1. **研究清楚 WPS 协作机器人协议**（对照社区 `wps-xiezuo-sdk` 与开放平台文档）：
+   - **认证**：OAuth token（`POST {api}/oauth2/token`，client_credentials：appId + secretKey）
+   - **发送**：`POST {api}/v7/messages/create`，KSO-1 HMAC-SHA256 签名（`X-Kso-Authorization`）+ Bearer token；receiver 私聊=`user`/群聊=`chat`
+   - **接收**：HTTP 回调。GET `?challenge=` 应答 URL 验证；POST `topic=kso.app_chat.message`，HMAC-SHA256 base64url 验签（300s 时间窗）+ AES-256-CBC 解密（key=md5(secretKey) 的 UTF-8 32 字节、IV=nonce）→ 解析为 InboundMessage
+   - **群聊需 @机器人** 才响应（与 SDK 默认一致）
+2. **`channels/woa.py` 重写为真实 WPS 通道**：发送 + webhook 接收 + 全部加解密；`config.yaml`/`.env` 增加 `appId`/`secretKey`/`encryptKey`/`apiUrl`/`webhookHost/Port/Path`。
+3. **13 个新单测**：KSO1/事件签名、AES 解密、发送（假 WPS API 服务器：token + 消息体 + 签名头）、接收（构造真实加密+签名回调 → 验签 → 解密 → 投递；群聊 @bot 规则；坏签名丢弃；Challenge 应答）。
+4. 顺带把 `httpx.py` 的 HTTP 服务器扩展为可向路由回调传原始请求体+请求头（验签需要）。
+
+## 需要你提供（真实联调 WOA）
+
+在 [WPS 开放平台](https://open.wps.cn/)（或 jp-open.wps.com）创建内部企业应用，开启机器人/消息能力、选 **HTTP 回调模式**，然后给我：
+1. **App ID**、**Secret Key**（必需）
+2. **Encrypt Key**（若回调加密）
+3. **API 地址**（日本/海外平台的实际 apiUrl，默认 `https://openapi.wps.cn`）
+4. **回调地址怎么暴露给 WPS**：WPS 要能访问桥接的 `http://<公网>:8766/webhook`。若你的机器在内网，告诉我有没有公网 IP/内网穿透方案，或我把桥接的 webhook 部分做成可部署到公网小服务器的形态。
+
+## 第 31 轮实测结果
+
+- ✅ 98/98 单测通过（新增 13 个 WOA 单测）
+- ✅ WOA 发送/接收/加解密全路径测试锁定（真实凭据联调待你提供）
+
+## 仍待你拍板(其余)
+
+飞书用哪种机器人 / QQ 用哪个 OneBot / 默认工作区 / 通知策略 / 常驻方式 / 管理 API 是否外露 —— 见 REPORT 顶部速览。
 
 ---
 

@@ -73,17 +73,34 @@ QQ 侧需要跑一个 **OneBot11 协议端**(把 QQ 变成可编程机器人), �
 
 ---
 
-## 3. WOA
+## 3. WOA（WPS 协作 / WPS365 企业机器人）
 
-**状态: 待确认。** "WOA 协作"目前没有可识别的公开标准协议(见 REPORT.md)。在你说清楚它是什么之前, WOA 通道 = 一个通用 HTTP 入站端点(默认 `127.0.0.1:8766`), 任何能 POST JSON 的工具/平台都能驱动桥接:
+协议已实现（发送 + HTTP 回调接收）。接入步骤：
 
-```bash
-curl -X POST http://127.0.0.1:8766/message \
-  -H 'content-type: application/json' \
-  -d '{"text": "帮我查一下天气"}'
-```
+1. **WPS 开放平台建应用**：登录 [WPS 开放平台](https://open.wps.cn/)（海外/日本版 [jp-open.wps.com](https://jp-open.wps.com/)）→ 创建**内部企业应用**。
+2. 应用里开启**机器人/消息能力**，消息模式选 **HTTP 回调模式**；开通发送/接收消息所需权限。
+3. 拿到三项凭据：
+   - **App ID**（`appId`）
+   - **Secret Key**（`secretKey`，用于 API 签名 + 回调解密）
+   - **Encrypt Key**（`encryptKey`，回调加密密钥，可选）
+4. **回调地址**：填桥接的 webhook，例如 `http://<公网可达地址>:8766/webhook`。
+   > ⚠️ 部署要点：WPS 平台需要**能访问到**这个地址。家里/公司内网 NAT 后面跑桥接的话，需要用内网穿透/反向代理（如 frp、cloudflare tunnel、ngrok），或把桥接放到有公网 IP 的机器上。这正是桥接是"独立进程"的原因——可以跑在公网服务器上，`dsh` 用 `--dsh` 指向回环/内网里的 dsh。
+5. 配置：
+   ```yaml
+   channels:
+     woa:
+       enabled: true
+       appId: "wps-app-id"
+       secretKey: "wps-secret-key"
+       # encryptKey: "xxx"
+       apiUrl: "https://openapi.wps.cn"     # 日本/海外平台地址按实际填写
+       webhookHost: "0.0.0.0"
+       webhookPort: 8766
+       webhookPath: "/webhook"
+   ```
+6. 验证：`dsh-im-bridge --config config.yaml --test-notify woa`（会向目标会话发一条测试消息）。然后私聊机器人或群里 @机器人 发消息，即可驱动 dsh（群聊需要 @机器人 才响应）。
 
-等你知道 WOA 的真实 API(webhook 回调格式 / 协议)后, 我们把 `channels/woa.py` 从通用端点替换成真实适配器即可, 桥接核心不用动。
+**自测**：日志出现 `woa webhook listening on ...` 且 `--test-notify woa` 成功，说明发送/接收都通了。
 
 ---
 
