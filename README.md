@@ -121,10 +121,11 @@ python scripts/e2e_smoke.py --cwd "D:/mycode/python/local-dev"
 ```bash
 python scripts/demo_confirmation.py            # 手动回答
 python scripts/demo_confirmation.py --auto 4   # 4 秒后自动回答
-python scripts/demo_woa.py                     # WOA(WPS 协作)通道端到端演示(假 WPS 服务器)
+python scripts/demo_woa.py                     # WOA(WPS 协作)通道端到端演示(已弃用，备用)
+python scripts/demo_im.py                      # 飞书 + QQ 端到端演示(假服务器，无凭据预览)
 ```
 
-用模拟的 wire 跑通"agent 提问 → 你回答 `/answer 1:方案A` → agent 继续"的完整闭环(真实 Hub/通道代码)。`demo_woa.py` 演示 WPS 消息 → 桥接(验签解密) → dsh → 回复发回 WPS 的全链路。
+用模拟的 wire 跑通"agent 提问 → 你回答 `/answer 1:方案A` → agent 继续"的完整闭环(真实 Hub/通道代码)。`demo_im.py` 演示飞书(长连接)/QQ(OneBot WS)消息 → 桥接 → dsh → 回复发回平台的全链路。
 
 ### 常驻运行 (Windows / Ubuntu)
 
