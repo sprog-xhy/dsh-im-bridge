@@ -40,15 +40,14 @@ from .formatter import (
     truncate,
 )
 from .parser import approval_from_frame, parse_mux_frame, question_from_frame
+from .config import DEFAULT_FORWARD_EVENTS
 
 log = logging.getLogger("dsh_im_bridge.hub")
 
 # Event types that produce a notification when they arrive for a bound session.
 # `step/end` is intentionally NOT included by default: it fires on every step and
 # would spam the channel on multi-step tasks — `turn/end` already marks "done".
-DEFAULT_FORWARD_EVENTS = frozenset(
-    {"user/message", "assistant/message", "tool/result", "turn/end"}
-)
+# Defined in config so YAML/CLI validation and runtime defaults stay in sync.
 
 
 class SessionBinding:
@@ -367,6 +366,10 @@ class BridgeHub:
         if not session_id:
             return
         keys = self._by_session.get(session_id)
+        log.debug(
+            "forward check: type=%s session=%s keys=%s in_forward=%s",
+            event.type, session_id, bool(keys), event.type in self.forward_events,
+        )
         if not keys:
             return
         if event.type not in self.forward_events:

@@ -76,6 +76,25 @@ def test_load_config_defaults(tmp_path):
     assert "webhook" in c.channels
 
 
+def test_load_config_forward_events_default_not_empty():
+    """Regression: an unset `forwardEvents` must fall back to the default set,
+    not to an empty set (which silently drops every dsh reply)."""
+    from dsh_im_bridge.config import DEFAULT_FORWARD_EVENTS
+
+    c = load_config()
+    assert c.forward_events == DEFAULT_FORWARD_EVENTS
+    assert c.forward_events  # non-empty
+    assert "assistant/message" in c.forward_events
+    assert "turn/end" in c.forward_events
+
+
+def test_load_config_forward_events_custom(tmp_path):
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("bridge:\n  forwardEvents:\n    - turn/end\n", encoding="utf-8")
+    c = load_config(str(cfg))
+    assert c.forward_events == frozenset({"turn/end"})
+
+
 def test_load_config_file(tmp_path):
     cfg = tmp_path / "config.yaml"
     cfg.write_text(

@@ -103,6 +103,7 @@ powershell -ExecutionPolicy Bypass -File scripts\install-windows-task.ps1
 | 现象 | 排查 |
 |---|---|
 | `--check` 里 dsh 标红 | 桥接要和 dsh 同系统/同网络(见 REPORT 第 10 轮 WSL 说明) |
+| 发送报 `230006 Bot ability is not activated` | 应用**未发布**：应用能力里加"机器人"、权限 `im:message`/`im:message:send_as_bot`/`im:message.p2p_msg`/`im:message.group_msg` 生效后，去"版本管理与发布"→ 创建版本 → 发布 |
 | 飞书能发不能收 | 用了自定义机器人(仅发送), 改用应用机器人 + 长连接 |
 | 飞书日志没有 `endpoint` | 应用没开"长连接"事件订阅 / 没发布权限 |
 | QQ 连不上 | OneBot 协议端没跑 / wsUrl 端口不对 / 要 access_token |

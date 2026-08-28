@@ -28,6 +28,13 @@ DEFAULT_CONFIG = {
     },
 }
 
+# Event types forwarded to bound IM conversations when `forwardEvents` is not
+# configured. Keeping these in sync with `hub.DEFAULT_FORWARD_EVENTS`:
+# `step/end` is intentionally excluded (fires every step; `turn/end` marks done).
+DEFAULT_FORWARD_EVENTS = frozenset(
+    {"user/message", "assistant/message", "tool/result", "turn/end"}
+)
+
 
 @dataclasses.dataclass
 class Config:
@@ -181,7 +188,11 @@ def load_config(path: Optional[str] = None) -> Config:
         default_workspace_id=bridge.get("defaultWorkspaceId"),
         default_cwd=bridge.get("defaultCwd"),
         agent_preset=bridge.get("agentPreset"),
-        forward_events=frozenset(bridge.get("forwardEvents") or []),
+        forward_events=(
+            frozenset(bridge["forwardEvents"])
+            if bridge.get("forwardEvents")
+            else DEFAULT_FORWARD_EVENTS
+        ),
         max_message_chars=int(bridge.get("maxMessageChars", 2000)),
         catch_up=bool(bridge.get("catchUp", True)),
         catch_up_max_events=int(bridge.get("catchUpMaxEvents", 200)),
