@@ -185,15 +185,16 @@ class WoaChannel(Channel):
             "content": {"text": {"content": text, "type": "markdown"}},
         }
         body_string = json.dumps(body, ensure_ascii=False)
+        body_bytes = body_string.encode("utf-8")  # deterministic across platforms
         token = self._access_token()
         kso_date = _rfc1123_date()
         auth = _kso1_signature(self.app_id, self.secret_key, "POST", path,
                                "application/json", kso_date, body_string)
         resp = requests.post(
             f"{self.api_url}{path}",
-            data=body_string,
+            data=body_bytes,
             headers={
-                "content-type": "application/json",
+                "content-type": "application/json; charset=utf-8",
                 "X-Kso-Date": kso_date,
                 "X-Kso-Authorization": auth,
                 "Authorization": f"Bearer {token}",

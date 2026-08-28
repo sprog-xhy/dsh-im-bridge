@@ -645,9 +645,30 @@ WOA 定义 / 飞书用哪种机器人 / QQ 用哪个 OneBot / 默认工作区 / 
 
 ---
 
-# 开发报告 (第 32 轮) — WPS webhook 公网中继
+# 开发报告 (第 33 轮) — WOA 跨平台编码修复 + 中继 systemd
 
-## 本轮新增(测试 98 → **101 个**)
+## 本轮新增
+
+1. **修复 WOA 发送的跨平台编码问题** — Ubuntu 上 `test_send_text_group` 失败(请求体被截断/乱码): `requests` 对 `data=<str>` 的 str→bytes 编码在不同平台/环境不一致。改为**显式 UTF-8 字节**发送 + `content-type: application/json; charset=utf-8`，KSO1 签名仍按同一字符串计算。修复后 **Windows 与 Ubuntu 均 101/101 通过**。
+2. **中继 systemd 单元** — `scripts/systemd/wps-relay.service`，方便在公网服务器上一键部署 `wps_relay.py`。
+
+## 第 33 轮实测结果
+
+- ✅ Windows: 101/101
+- ✅ Ubuntu (WSL2): 101/101
+- ✅ 跨平台一致性确认（WOA 发送/接收/加解密 + 中继转发全绿）
+
+## 仍待你提供（WOA 真实联调）
+
+WPS 开放平台建应用后给我：App ID、Secret Key、Encrypt Key（若有）、API 地址（日本平台实际 apiUrl）。回调部署方案三选一（公网 IP / 内网穿透 / wps_relay 公网中继），告诉我选哪个。
+
+---
+
+祝睡个好觉 🌙 明天见。
+
+---
+
+# 开发报告 (第 32 轮) — WPS webhook 公网中继
 
 1. **`scripts/wps_relay.py` 公网中继** — 解决 WOA 真实联调的最大部署难点：WPS 平台要能访问回调地址，而桥接核心必须贴着内网的 dsh。
    - 在公网小服务器跑中继：接收 WPS 回调 → 验签 + AES 解密 + 解析（复用 WoaChannel 已测逻辑）→ 转发给内网桥接核心的 `/message` API。

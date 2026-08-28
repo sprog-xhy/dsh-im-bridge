@@ -1,0 +1,24 @@
+[Unit]
+Description=dsh-im-bridge WPS webhook relay (public server side)
+After=network.target
+
+[Service]
+Type=simple
+# Replace paths, then start with:
+#   sudo ./scripts/install-systemd.sh /abs/path/to/dsh-im-bridge  (bridge core)
+#   or adapt this unit for the relay and run on the public server:
+#   sed -e 's|/path/to/dsh-im-bridge|/opt/dsh-im-bridge|g' scripts/systemd/wps-relay.service | sudo tee /etc/systemd/system/wps-relay.service
+WorkingDirectory=/path/to/dsh-im-bridge
+# Fill in your WPS app credentials and the inner bridge core address.
+ExecStart=/path/to/dsh-im-bridge/.venv/bin/python /path/to/dsh-im-bridge/scripts/wps_relay.py \
+    --app-id YOUR_APP_ID \
+    --secret-key YOUR_SECRET_KEY \
+    --host 0.0.0.0 --port 8766 --path /webhook \
+    --forward http://YOUR_INNER_BRIDGE:8764/message
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
