@@ -29,6 +29,15 @@ async def _test_notify(config, channel_name: str, target: str) -> int:
         print(f"  ❌ channel {channel_name!r} is not enabled in the config")
         return 1
     channel = create_channel(channel_name, config.channels[channel_name])
+    # app-bot feishu sending needs a real chat_id; give a clear hint instead of
+    # a confusing API error when the user hasn't provided one yet.
+    if (
+        channel_name == "feishu"
+        and not config.channels["feishu"].get("webhookUrl")
+        and not target
+    ):
+        print("  💡 应用机器人发送需要 chat_id：先用 --notify-target <chat_id> 指定，")
+        print("     或直接起桥接后私聊机器人一句（桥接会自动记下你的 chat_id 并回复）。")
     try:
         await channel.start()
         # give WS-style channels (qq, feishu long-connection) a moment to connect
