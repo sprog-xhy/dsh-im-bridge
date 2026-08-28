@@ -30,6 +30,7 @@ import hmac
 import json
 import logging
 import time
+from collections import OrderedDict
 from typing import Optional
 from urllib.parse import parse_qs, urlparse
 
@@ -138,6 +139,10 @@ class WoaChannel(Channel):
         self._token: Optional[str] = None
         self._token_expires_at = 0.0
         self._server: Optional[MinimalHttpServer] = None
+        # message-id dedup (WPS may retry webhooks)
+        self._seen: "OrderedDict[str, float]" = OrderedDict()
+        self._dedup_max = 2000
+        self._dedup_ttl = 3600.0
 
     # -- tokens ------------------------------------------------------------
     def _access_token(self) -> str:
@@ -267,10 +272,28 @@ class WoaChannel(Channel):
                               "chat": {}, "sender": {}}
         else:
             event_data = body.get("data") or body
+        # dedup by message id (WPS may retry a webhook if the response is slow)
+        msg_id = (event_data.get("message") or {}).get("id") or ""
+        if msg_id and self._is_seen(msg_id):
+            self.log.debug("woa: duplicate message %s skipped", msg_id)
+            return
         message = self._parse_message(event_data)
         if message is None:
             return
         self.deliver(message)
+
+    # -- dedup -------------------------------------------------------------
+    def _is_seen(self, message_id: str) -> bool:
+        now = time.time()
+        # drop stale entries
+        while self._seen and next(iter(self._seen.values())) < now - self._dedup_ttl:
+            self._seen.popitem(last=False)
+        if message_id in self._seen:
+            return True
+        self._seen[message_id] = now
+        if len(self._seen) > self._dedup_max:
+            self._seen.popitem(last=False)
+        return False
 
     def _parse_message(self, event: dict) -> Optional[InboundMessage]:
         msg = event.get("message") or {}

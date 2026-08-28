@@ -1,4 +1,4 @@
-﻿"""Tests for the WPS 协作 (WOA) channel: crypto, send, receive.
+"""Tests for the WPS 协作 (WOA) channel: crypto, send, receive.
 
 The send path runs against a fake WPS API server; the receive path builds real
 encrypted+signed webhook payloads and verifies the channel's signature check,
@@ -240,6 +240,18 @@ async def test_receive_strips_at_tags():
     event = _text_event('<at id="1">@bot</at> 你好')
     ch._handle_message_event(_signed_event_body(SECRET, event), "", {})
     assert hub.inbound[0].text == "你好"
+
+
+@pytest.mark.asyncio
+async def test_receive_dedup_same_message_id():
+    hub = _FakeHub()
+    ch = WoaChannel({"appId": APP_ID, "secretKey": SECRET})
+    ch.bind(hub)
+    event = _text_event("你好", chat_type="p2p", sender_id="u-1")
+    body = _signed_event_body(SECRET, event, nonce="abcdefgh12345678")
+    ch._handle_message_event(body, "", {})          # first -> delivered
+    ch._handle_message_event(body, "", {})          # duplicate -> skipped
+    assert len(hub.inbound) == 1
 
 
 @pytest.mark.asyncio
