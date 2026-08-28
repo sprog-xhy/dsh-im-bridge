@@ -190,6 +190,8 @@ async def _amain(args: argparse.Namespace) -> int:
         catch_up=config.catch_up,
         catch_up_max_events=config.catch_up_max_events,
         notify_on_start=config.notify_on_start,
+        send_welcome_on_bind=config.send_welcome_on_bind,
+        include_reasoning=config.include_reasoning,
         send_retries=config.send_retries,
         send_retry_delay=config.send_retry_delay,
     )

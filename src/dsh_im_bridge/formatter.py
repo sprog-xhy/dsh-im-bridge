@@ -118,6 +118,19 @@ def answer_help_text() -> str:
     )
 
 
+def welcome_text() -> str:
+    """Welcome message sent when an IM conversation first binds to a dsh session."""
+    return (
+        "👋 已连接到 dsh agent，现在可以开始干活了！\n\n"
+        "直接发消息 = 给绑定的 dsh agent 派任务，比如：\n"
+        "  • 帮我查一下当前时间是几点\n"
+        "  • 列出当前目录的文件\n"
+        "  • 写一个 Python 脚本做 XX\n\n"
+        "任务完成后会自动收到通知；需要你确认/审批时也会主动推给你，直接回复即可。\n\n"
+        + answer_help_text()
+    )
+
+
 def attachment_hint(event: SessionEvent) -> str:
     """Compact note about image attachments carried by a message event.
 

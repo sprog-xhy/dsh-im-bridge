@@ -38,6 +38,7 @@ from .formatter import (
     render_question,
     render_session_event,
     truncate,
+    welcome_text,
 )
 from .parser import approval_from_frame, parse_mux_frame, question_from_frame
 from .config import DEFAULT_FORWARD_EVENTS
@@ -88,6 +89,8 @@ class BridgeHub:
         catch_up: bool = True,
         catch_up_max_events: int = 200,
         notify_on_start: bool = True,
+        send_welcome_on_bind: bool = True,
+        include_reasoning: bool = False,
         send_retries: int = 2,
         send_retry_delay: float = 1.0,
     ):
@@ -103,6 +106,8 @@ class BridgeHub:
         self.catch_up = catch_up
         self.catch_up_max_events = catch_up_max_events
         self.notify_on_start = notify_on_start
+        self.send_welcome_on_bind = send_welcome_on_bind
+        self.include_reasoning = include_reasoning
         self.send_retries = send_retries
         self.send_retry_delay = send_retry_delay
 
@@ -229,12 +234,20 @@ class BridgeHub:
             )
             return
         if is_new_binding:
-            await self._send(
-                message.channel,
-                message.conversation_id,
-                f"已绑定到 dsh 会话 {binding.session_id}，现在开始干活 🚀",
-                kind="notify",
-            )
+            if self.send_welcome_on_bind:
+                await self._send(
+                    message.channel,
+                    message.conversation_id,
+                    welcome_text(),
+                    kind="notify",
+                )
+            else:
+                await self._send(
+                    message.channel,
+                    message.conversation_id,
+                    f"已绑定到 dsh 会话 {binding.session_id}，现在开始干活 🚀",
+                    kind="notify",
+                )
 
     async def _auto_bind(self, channel: str, conversation_id: str) -> SessionBinding:
         payload: dict = {}
@@ -379,7 +392,9 @@ class BridgeHub:
             data = event.data or {}
             if not data.get("isError") and not (data.get("content") or data.get("message")):
                 return
-        text = render_session_event(event)
+        text = render_session_event(
+            event, include_reasoning=self.include_reasoning
+        )
         if not text:
             return
         if event.type in ("assistant/message", "user/message"):

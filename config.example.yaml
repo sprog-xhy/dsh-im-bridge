@@ -27,6 +27,12 @@ bridge:
   catchUpMaxEvents: 200
   # Send a "bridge started" message to every bound conversation on startup.
   notifyOnStart: true
+  # When a conversation first binds to a dsh session, send the welcome message
+  # (功能说明 + 全部可用指令列表).
+  sendWelcomeOnBind: true
+  # Forward the agent's internal reasoning together with its answer.
+  # true  = 所有回复都带思考过程发给你; false = 只发结论.
+  includeReasoning: false
 
 channels:
   console:

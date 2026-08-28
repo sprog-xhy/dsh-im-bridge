@@ -20,6 +20,8 @@ def _cfg(**overrides):
         "catch_up": True,
         "catch_up_max_events": 200,
         "notify_on_start": True,
+        "send_welcome_on_bind": True,
+        "include_reasoning": False,
         "send_retries": 2,
         "send_retry_delay": 1.0,
         "channels": {},
@@ -93,6 +95,23 @@ def test_load_config_forward_events_custom(tmp_path):
     cfg.write_text("bridge:\n  forwardEvents:\n    - turn/end\n", encoding="utf-8")
     c = load_config(str(cfg))
     assert c.forward_events == frozenset({"turn/end"})
+
+
+def test_load_config_reasoning_and_welcome_defaults(tmp_path):
+    c = load_config()
+    assert c.include_reasoning is False
+    assert c.send_welcome_on_bind is True
+
+
+def test_load_config_reasoning_and_welcome_custom(tmp_path):
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text(
+        "bridge:\n  includeReasoning: true\n  sendWelcomeOnBind: false\n",
+        encoding="utf-8",
+    )
+    c = load_config(str(cfg))
+    assert c.include_reasoning is True
+    assert c.send_welcome_on_bind is False
 
 
 def test_load_config_file(tmp_path):

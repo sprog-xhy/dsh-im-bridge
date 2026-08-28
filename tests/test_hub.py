@@ -127,7 +127,20 @@ async def test_auto_bind_and_prompt(hub):
     assert len(dsh.created) == 1
     assert dsh.prompts == [("s-1", "do the thing", "queue")]
     assert h.bindings["rec:c1"].session_id == "s-1"
+    # default send_welcome_on_bind=True => welcome message with features+commands
+    assert any("可用指令" in t for _, t, k in chan.sent)
+    assert any("/status" in t and "/new" in t for _, t, k in chan.sent)
+
+
+@pytest.mark.asyncio
+async def test_auto_bind_welcome_disabled(hub):
+    h, dsh = hub
+    h.send_welcome_on_bind = False
+    chan = RecordingChannel()
+    h.register(chan)
+    await h._handle_inbound(InboundMessage(channel="rec", conversation_id="c1", text="do the thing"))
     assert any("已绑定" in t for _, t, k in chan.sent)
+    assert not any("可用指令" in t for _, t, k in chan.sent)
 
 
 @pytest.mark.asyncio
@@ -182,6 +195,70 @@ async def test_event_forwarding_only_bound(hub):
     payload["sessionId"] = "s-other"
     await h._on_frame(_frame_payload(payload))
     assert chan.sent == []
+
+
+@pytest.mark.asyncio
+async def test_include_reasoning_off_by_default(hub):
+    """Reasoning blocks are hidden unless include_reasoning is enabled."""
+    h, dsh = hub
+    chan = RecordingChannel()
+    h.register(chan)
+    from dsh_im_bridge.hub import SessionBinding
+
+    h._add_binding(SessionBinding("rec:c1", "s-9"))
+    payload = {
+        "type": "session/event",
+        "sessionId": "s-9",
+        "event": {
+            "type": "assistant/message",
+            "seq": 2,
+            "time": 100.0,
+            "data": {
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "reasoning", "text": "内部思考过程"},
+                        {"type": "text", "text": "结论文本"},
+                    ],
+                }
+            },
+        },
+    }
+    await h._on_frame(_frame_payload(payload))
+    assert any("结论文本" in t for _, t, k in chan.sent)
+    assert not any("内部思考过程" in t for _, t, k in chan.sent)
+
+
+@pytest.mark.asyncio
+async def test_include_reasoning_on_shows_reasoning(hub):
+    h, dsh = hub
+    h.include_reasoning = True
+    chan = RecordingChannel()
+    h.register(chan)
+    from dsh_im_bridge.hub import SessionBinding
+
+    h._add_binding(SessionBinding("rec:c1", "s-9"))
+    payload = {
+        "type": "session/event",
+        "sessionId": "s-9",
+        "event": {
+            "type": "assistant/message",
+            "seq": 3,
+            "time": 100.0,
+            "data": {
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {"type": "reasoning", "text": "内部思考过程"},
+                        {"type": "text", "text": "结论文本"},
+                    ],
+                }
+            },
+        },
+    }
+    await h._on_frame(_frame_payload(payload))
+    assert any("结论文本" in t for _, t, k in chan.sent)
+    assert any("内部思考过程" in t for _, t, k in chan.sent)
 
 
 @pytest.mark.asyncio
