@@ -84,7 +84,16 @@ QQ 侧需要跑一个 **OneBot11 协议端**(把 QQ 变成可编程机器人), �
    - **Secret Key**（`secretKey`，用于 API 签名 + 回调解密）
    - **Encrypt Key**（`encryptKey`，回调加密密钥，可选）
 4. **回调地址**：填桥接的 webhook，例如 `http://<公网可达地址>:8766/webhook`。
-   > ⚠️ 部署要点：WPS 平台需要**能访问到**这个地址。家里/公司内网 NAT 后面跑桥接的话，需要用内网穿透/反向代理（如 frp、cloudflare tunnel、ngrok），或把桥接放到有公网 IP 的机器上。这正是桥接是"独立进程"的原因——可以跑在公网服务器上，`dsh` 用 `--dsh` 指向回环/内网里的 dsh。
+   > ⚠️ 部署要点：WPS 平台需要**能访问到**这个地址。三条路（任选）：
+   > 1. 桥接机器有公网 IP / 已映射端口 → 直接填。
+   > 2. 内网穿透 / 反向代理（frp、cloudflare tunnel、ngrok）把 `8766` 转发到公网。
+   > 3. **公网中继**（推荐给"桥接必须贴内网 dsh"的场景）：在公网小服务器上跑 `scripts/wps_relay.py`，它接收 WPS 回调、验签解密后转发给内网桥接核心的 `/message` API；回复仍由桥接核心直接出站 HTTPS 发回 WPS（NAT 也能发）：
+   >    ```bash
+   >    # 公网服务器上：
+   >    python scripts/wps_relay.py --app-id <AppID> --secret-key <Secret> \
+   >        --host 0.0.0.0 --port 8766 --forward http://<内网桥接机>:8764/message
+   >    # 回调地址填 http://<公网服务器>:8766/webhook
+   >    ```
 5. 配置：
    ```yaml
    channels:
