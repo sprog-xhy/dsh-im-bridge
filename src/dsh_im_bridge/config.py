@@ -152,6 +152,7 @@ def load_config(path: Optional[str] = None) -> Config:
             # env overrides for secrets / urls
             clone = dict(cfg)
             if name == "feishu":
+                clone["baseUrl"] = _env("FEISHU_BASE_URL", clone.get("baseUrl", "https://open.feishu.cn"))
                 clone["webhookUrl"] = _env("FEISHU_WEBHOOK_URL", clone.get("webhookUrl", "")) or None
                 clone["appId"] = _env("FEISHU_APP_ID", clone.get("appId", "")) or None
                 clone["appSecret"] = _env("FEISHU_APP_SECRET", clone.get("appSecret", "")) or None

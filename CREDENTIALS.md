@@ -12,8 +12,9 @@ FEISHU_WEBHOOK_URL = ?   # 飞书群里加"自定义机器人"得到，形如 ht
 ```
 
 - [ ] **方式 B：应用机器人（能双向收发，推荐）**
-  在[飞书开放平台](https://open.feishu.cn/app)建应用 → 权限管理开通并发布 `im:message` / `im:message:send_as_bot` → 事件订阅选"长连接(WebSocket)"、添加 `im.message.receive_v1` → 拿下面三项：
+  在[飞书开放平台](https://open.feishu.cn/app)建应用（国际版用 [Lark](https://open.larksuite.com)）→ 权限管理开通并发布 `im:message` / `im:message:send_as_bot` → 事件订阅选"长连接(WebSocket)"、添加 `im.message.receive_v1` → 拿下面三项：
 ```
+FEISHU_BASE_URL = https://open.feishu.cn   # 国际版 Lark 用 https://open.larksuite.com
 FEISHU_APP_ID = ?
 FEISHU_APP_SECRET = ?
 FEISHU_ENCRYPT_KEY = ?   # 若事件订阅开了加密

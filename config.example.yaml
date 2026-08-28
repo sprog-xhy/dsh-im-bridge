@@ -40,6 +40,7 @@ channels:
 
   feishu:
     enabled: false
+    # baseUrl: "https://open.feishu.cn"     # 国内版；国际版 Lark 用 https://open.larksuite.com
     # Custom-bot webhook (send-only) — fastest way to get notifications:
     # webhookUrl: "https://open.feishu.cn/open-apis/bot/v2/hook/<token>"
     # Two-way app bot (send + receive):
