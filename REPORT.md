@@ -1,6 +1,6 @@
 # 📋 给明天睡醒的你（先看这里）
 
-**程序已经开发完成并在你机器上通过全部验证**（在 `D:\mycode\python\local-dev\dsh-im-bridge`）。WOA = **WPS 协作** 已确认并实现（发送+HTTP 回调接收），现在只差真实凭据联调。
+**程序已经开发完成并在你机器上通过全部验证**（在 `D:\mycode\python\local-dev\dsh-im-bridge`）。当前联调目标：**飞书 + QQ**（WOA/WPS 协作因需管理员审核已弃用）。
 
 **1) 验证一下环境（30 秒）**
 ```bash
@@ -12,17 +12,16 @@ python scripts\verify_all.py --auto 4 --pytest   # Ubuntu 用 python3 scripts/ve
 **2) 提供凭据 / 拍板（回复给我即可）**
 > 最快方式：填 [CREDENTIALS.md](CREDENTIALS.md) 里的表，一次性发给我，我就把所有通道配好联调。
 
-- **WOA（WPS 协作）**：在 [WPS 开放平台](https://open.wps.cn/)（或 [jp-open.wps.com](https://jp-open.wps.com/)）建内部企业应用、开机器人消息能力、选 **HTTP 回调模式**，给我：**App ID**、**Secret Key**、Encrypt Key（若有）、**API 地址**（日本平台的实际 apiUrl）。还有：**回调地址怎么让 WPS 访问到**（公网 IP？内网穿透？还是用 `wps_relay.py` 公网中继？）。
-- **飞书**：用自定义机器人（仅收通知）还是应用机器人（双向）？后者给我 app_id/app_secret。
-- **QQ**：用哪个协议端（NapCat 等）？WS 地址 + 机器人号。
+- **飞书**（二选一）：A. 群里加"自定义机器人"给我 webhook URL（最快）；B. 在[飞书开放平台](https://open.feishu.cn/app)建应用、开 `im:message`/`im:message:send_as_bot`、事件订阅选长连接、加 `im.message.receive_v1`，给我 app_id/app_secret。
+- **QQ**：跑一个 OneBot11 协议端（NapCat 等，用 QQ 小号），开 WS 服务器模式，给我 WS 地址 + 机器人号。
 - **其余**：默认工作目录、通知策略（现在=最终回答+工具结果+完成+确认）、是否装常驻服务、管理 API 是否外露。
 
 **3) 联调真实通道（我拿到凭据后马上做）**
-照 `INTEGRATION.md` 操作，用 `--test-notify feishu/qq/woa` 发测试消息确认通道通了，然后就能"群里/私聊喊 dsh、手机收完成通知、回复确认选择"。
+照 `INTEGRATION.md` 操作，用 `--test-notify feishu/qq` 发测试消息确认通道通了，然后就能"群里/私聊喊 dsh、手机收完成通知、回复确认选择"。
 
 > 聊天里的快捷指令：`/help` `/status` `/sessions` `/attach <会话ID>` `/new` `/answer 1:选项` `/allow` `/reject` `/cancel` `/history`。
 
-详细开发过程见下方 1-31 轮报告。核心结论: 所有核心场景（任务完成通知、需要你确认、你主动发消息）都已在真实 dsh 上验证通过; 飞书/QQ/WOA 代码全路径有测试, 就差真实凭据联调。
+详细开发过程见下方各轮报告。核心结论: 所有核心场景（任务完成通知、需要你确认、你主动发消息）都已在真实 dsh 上验证通过; 飞书/QQ 代码全路径有测试, 就差真实凭据联调。
 
 ---
 
