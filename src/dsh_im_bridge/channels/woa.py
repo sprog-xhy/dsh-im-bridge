@@ -146,6 +146,8 @@ class WoaChannel(Channel):
 
     # -- tokens ------------------------------------------------------------
     def _access_token(self) -> str:
+        if not self.app_id or not self.secret_key:
+            raise WoaError("woa: appId/secretKey 未配置（在 config 或 .env 里填 WPS 应用凭据）")
         now = time.time()
         if self._token and self._token_expires_at > now + 60:
             return self._token
@@ -181,8 +183,10 @@ class WoaChannel(Channel):
         await asyncio.to_thread(self._send_text, cid, receiver_type, text)
 
     def _send_text(self, receiver_id: str, receiver_type: str, text: str) -> None:
+        if not self.app_id or not self.secret_key:
+            raise WoaError("woa: appId/secretKey 未配置（在 config 或 .env 里填 WPS 应用凭据）")
         if not receiver_id:
-            raise WoaError("woa: empty receiver id")
+            raise WoaError("woa: empty receiver id（WOA 目标需带前缀，如 p2p:<用户id> 或 group:<群id>）")
         path = "/v7/messages/create"
         body = {
             "type": "text",

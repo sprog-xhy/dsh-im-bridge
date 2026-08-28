@@ -701,4 +701,21 @@ WPS 开放平台建应用后给我：App ID、Secret Key、Encrypt Key（若有�
 
 ---
 
+# 开发报告 (第 35 轮) — WOA 配置错误提示
+
+## 本轮新增
+
+1. **`--test-notify woa` 未配置凭据时给出清晰错误** — 之前会打出含糊的 "empty receiver id"，现在优先提示 `appId/secretKey 未配置（在 config 或 .env 里填 WPS 应用凭据）`；空接收者也提示需带前缀（`p2p:<用户id>` / `group:<群id>`）。
+
+## 第 35 轮实测结果
+
+- ✅ `--test-notify woa` 无凭据 → 清晰提示
+- ✅ 102/102 单测通过
+
+## 仍待你提供（WOA 真实联调）
+
+WPS 开放平台建应用后给我：App ID、Secret Key、Encrypt Key（若有）、API 地址（日本平台实际 apiUrl）。回调部署方案三选一（公网 IP / 内网穿透 / wps_relay 公网中继），告诉我选哪个。
+
+---
+
 祝睡个好觉 🌙 明天见。
