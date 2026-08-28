@@ -203,6 +203,7 @@ class BridgeHub:
             return
 
         binding = self.bindings.get(key)
+        is_new_binding = False
         if binding is None:
             try:
                 binding = await self._auto_bind(message.channel, message.conversation_id)
@@ -214,12 +215,9 @@ class BridgeHub:
                     kind="error",
                 )
                 return
-            await self._send(
-                message.channel,
-                message.conversation_id,
-                f"已绑定到 dsh 会话 {binding.session_id}，现在开始干活 🚀",
-                kind="notify",
-            )
+            is_new_binding = True
+        # Prompt FIRST: the user's message must reach dsh immediately even if
+        # a channel notification send is slow / retrying.
         try:
             self.client.prompt(binding.session_id, text, mode="queue")
             log.info("prompt -> %s: %s", binding.session_id, text[:120])
@@ -229,6 +227,14 @@ class BridgeHub:
                 message.conversation_id,
                 f"发送给 dsh 失败: {exc}",
                 kind="error",
+            )
+            return
+        if is_new_binding:
+            await self._send(
+                message.channel,
+                message.conversation_id,
+                f"已绑定到 dsh 会话 {binding.session_id}，现在开始干活 🚀",
+                kind="notify",
             )
 
     async def _auto_bind(self, channel: str, conversation_id: str) -> SessionBinding:
