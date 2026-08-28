@@ -735,4 +735,22 @@ WPS 开放平台建应用后给我：App ID、Secret Key、Encrypt Key（若有�
 
 ---
 
+# 开发报告 (第 38 轮) — `--test-notify woa` 完整 CLI 验证
+
+## 本轮新增
+
+1. **验证 `--test-notify woa` 的完整 CLI 路径** — 用假 WPS API（`scripts/_fake_wps_server.py`）+ 有效目标跑真实命令：`dsh-im-bridge --config ... --test-notify woa --notify-target p2p:user-demo` → `✅ 测试消息发送成功`、退出码 0。这正是你拿到真凭据后第一个要跑的命令，已验证一跑就通。
+2. 新增 `scripts/_fake_wps_server.py`（测试助手：起一个假 WPS API 服务器，可用于无凭据验证发送路径）。
+
+## 第 38 轮实测结果
+
+- ✅ `--test-notify woa` 全路径（配置加载 → 通道启动 → OAuth → KSO1 签名 → 发送）验证通过
+- ✅ 102/102 单测通过
+
+## 仍待你提供（WOA 真实联调）
+
+WPS 开放平台建应用后给我：App ID、Secret Key、Encrypt Key（若有）、API 地址（日本平台实际 apiUrl）。回调部署方案三选一（公网 IP / 内网穿透 / wps_relay 公网中继），告诉我选哪个。
+
+---
+
 祝睡个好觉 🌙 明天见。
