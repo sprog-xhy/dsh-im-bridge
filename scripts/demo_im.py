@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import websockets  # noqa: E402
 
-from dsh_im_bridge.channels.feishu import FeishuChannel  # noqa: E402
+from dsh_im_bridge.channels.feishu import FeishuChannel, encode_frame  # noqa: E402
 from dsh_im_bridge.channels.qq import QQOneBotChannel  # noqa: E402
 from dsh_im_bridge.hub import BridgeHub, SessionBinding  # noqa: E402
 
@@ -79,15 +79,15 @@ class _FeishuApiHandler(BaseHTTPRequestHandler):
         self._json({"code": 404}, 404)
 
 
-# -- fake Feishu long-connection WS ------------------------------------------
+# -- fake Feishu long-connection WS (current protobuf protocol) ---------------
 _feishu_sent_once = {"done": False}
 
 
 async def _feishu_ws(ws):
     if not _feishu_sent_once["done"]:
         _feishu_sent_once["done"] = True
-        await ws.send(json.dumps({"type": "Challenge", "challenge": "c-1"}))
         event = {
+            "schema": "2.0",
             "header": {"event_type": "im.message.receive_v1"},
             "event": {
                 "message": {"chat_id": "oc-demo", "chat_type": "p2p",
@@ -95,7 +95,8 @@ async def _feishu_ws(ws):
                 "sender": {"sender_id": {"open_id": "ou-demo"}},
             },
         }
-        await ws.send(json.dumps({"type": "Event", "event": event}))
+        await ws.send(encode_frame(method=1, headers=[("type", "event")],
+                                   payload=json.dumps(event).encode("utf-8")))
     try:
         await asyncio.wait_for(ws.recv(), timeout=3)  # wait for ChallengeResponse
     except Exception:  # noqa: BLE001
