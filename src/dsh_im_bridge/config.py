@@ -75,7 +75,7 @@ class Config:
             errors.append("feishu: appId set but appSecret missing (app bot needs both)")
         elif feishu.get("appSecret") and not feishu.get("appId"):
             errors.append("feishu: appSecret set but appId missing (app bot needs both)")
-        elif not feishu.get("appId") and not feishu.get("appSecret"):
+        elif self.channels.get("feishu") and not feishu.get("appId") and not feishu.get("appSecret"):
             warnings.append("feishu: enabled but has neither webhookUrl nor appId/appSecret — it will not connect")
 
         if self.channels.get("qq") and not self.channels["qq"].get("wsUrl"):
