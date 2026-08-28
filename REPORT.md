@@ -718,4 +718,21 @@ WPS 开放平台建应用后给我：App ID、Secret Key、Encrypt Key（若有�
 
 ---
 
+# 开发报告 (第 37 轮) — WOA 端到端演示
+
+## 本轮新增
+
+1. **`scripts/demo_woa.py` WOA 端到端演示**（无需凭据）— 用假 WPS 服务器 + 真实 WoaChannel + 真实 hub + 假 dsh 跑通完整链路：WPS 消息（真实验签+AES 加密格式）→ 桥接验签解密 → dsh → 回复经 `/v7/messages/create` 发回 WPS。已验证：`receiver={user-demo, user}`、回复文本正确。以后拿到真凭据前的预览/回归都可用它。
+
+## 第 37 轮实测结果
+
+- ✅ `demo_woa.py` 全链路跑通（消息进入→dsh 处理→回复发出）
+- ✅ 102/102 单测通过
+
+## 仍待你提供（WOA 真实联调）
+
+WPS 开放平台建应用后给我：App ID、Secret Key、Encrypt Key（若有）、API 地址（日本平台实际 apiUrl）。回调部署方案三选一（公网 IP / 内网穿透 / wps_relay 公网中继），告诉我选哪个。
+
+---
+
 祝睡个好觉 🌙 明天见。

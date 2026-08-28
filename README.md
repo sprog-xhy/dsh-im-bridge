@@ -120,9 +120,10 @@ python scripts/e2e_smoke.py --cwd "D:/mycode/python/local-dev"
 ```bash
 python scripts/demo_confirmation.py            # 手动回答
 python scripts/demo_confirmation.py --auto 4   # 4 秒后自动回答
+python scripts/demo_woa.py                     # WOA(WPS 协作)通道端到端演示(假 WPS 服务器)
 ```
 
-用模拟的 dsh wire 跑通"agent 提问 → 你回答 `/answer 1:方案A` → agent 继续"的完整闭环(真实 Hub/通道代码)。
+用模拟的 wire 跑通"agent 提问 → 你回答 `/answer 1:方案A` → agent 继续"的完整闭环(真实 Hub/通道代码)。`demo_woa.py` 演示 WPS 消息 → 桥接(验签解密) → dsh → 回复发回 WPS 的全链路。
 
 ### 常驻运行 (Windows / Ubuntu)
 
