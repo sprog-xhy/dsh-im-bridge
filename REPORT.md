@@ -796,4 +796,33 @@ WPS 开放平台建应用后给我：App ID、Secret Key、Encrypt Key（若有�
 
 ---
 
+# 开发报告 (第 55 轮) — 关键修复：飞书长连接接收协议对齐当前官方版
+
+## 背景（重要）
+
+你准备联调飞书期间，我下载了**官方 lark-oapi SDK (1.7.3)** 核实飞书长连接协议，发现**我之前实现的接收协议是过时版本**，用当前飞书**会收不到消息**：
+
+- 旧实现：`POST /open-apis/event/v1/long_connection` 拿动态端点 → JSON `Challenge/ChallengeResponse` 握手
+- **当前官方**：`POST {base}/callback/ws/endpoint`（body `{"AppID","AppSecret"}`）→ `data.URL` → WebSocket **protobuf 帧**（CONTROL/DATA），EVENT 需回 ACK `{"code":200}`，客户端每 ~120s 发 PING
+
+## 本轮改动
+
+1. **重写飞书长连接接收路径**对齐当前协议：
+   - 端点请求、protobuf 帧编解码（手工实现，无 protobuf 依赖）、EVENT 处理 + ACK、PING 保活、断线重连
+   - 事件载荷仍为 JSON（`{schema, header:{event_type}, event:{...}}`），解析逻辑不变
+2. 测试更新到新协议（protobuf 帧往返、EVENT 投递+ACK、PING 忽略、长连接循环）；`demo_im.py` 的飞书假 WS 同步更新。
+3. 这是联调前必须抓到的 bug——现在你给凭据后飞书**接收**真的能通。
+
+## 第 55 轮实测结果
+
+- ✅ 105/105 单测通过（Windows），飞书测试 Ubuntu 全过
+- ✅ `demo_im.py` 用新协议全链路跑通
+- ✅ 协议已对照官方 SDK 核实（端点/帧/ACK/保活）
+
+## 仍待你提供（飞书真实联调）
+
+建好应用后发我：`FEISHU_APP_ID` + `FEISHU_APP_SECRET`（+ encrypt_key 若加密，+ baseUrl 若国际版 Lark）。
+
+---
+
 祝睡个好觉 🌙 明天见。
