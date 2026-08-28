@@ -1,7 +1,10 @@
 """WPS 协作 (WOA / WPS365) channel.
 
-Implements the WPS open-platform bot protocol (verified against the community
-``wps-xiezuo-sdk`` and open-platform docs):
+⚠️ 已弃用（deprecated）：WPS 协作机器人需要企业管理员审核才能使用，用户已决定放弃
+联调，改用飞书 + QQ。本实现保留备用（发送/接收/加密/公网中继均可用且有测试），
+但默认禁用，不在当前联调范围。将来如拿到管理员授权，配置 `channels.woa` 即可启用。
+
+实现依据（对照社区 ``wps-xiezuo-sdk`` 与开放平台文档）：
 
 * **Send text**: ``POST {apiUrl}/v7/messages/create`` — OAuth access token
   (``/oauth2/token``, client_credentials) + KSO-1 HMAC-SHA256 signature.

@@ -60,12 +60,11 @@ channels:
 
   woa:
     enabled: false
-    # WPS 协作 (WPS365) 企业机器人。需要在 WPS 开放平台创建应用、配置"HTTP 回调模式"。
+    # ⚠️ 已弃用：WPS 协作(WPS365)需要管理员审核，放弃使用。代码保留备用；如以后能用再启用。
     appId: ""               # WPS 应用 App ID
     secretKey: ""           # WPS 应用 Secret Key（API 签名 + 回调解密）
     encryptKey: ""          # 可选，回调加密密钥
-    apiUrl: "https://openapi.wps.cn"   # 海外/日本平台地址请按实际填写（如 jp-open.wps.com 对应域名）
-    # 接收消息的 webhook（WPS 平台要能访问到这个地址——见 INTEGRATION.md 部署说明）
+    apiUrl: "https://openapi.wps.cn"
     webhookHost: "0.0.0.0"
     webhookPort: 8766
     webhookPath: "/webhook"

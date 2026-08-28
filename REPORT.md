@@ -755,4 +755,27 @@ WPS 开放平台建应用后给我：App ID、Secret Key、Encrypt Key（若有�
 
 ---
 
+# 开发报告 (第 46 轮) — 弃用 WOA，聚焦飞书 + QQ
+
+## 本轮决策
+
+**用户决定放弃 WOA（WPS 协作）**：它需要企业管理员审核、且不知道管理员是谁，太麻烦。改为联调 **飞书 + QQ**。
+
+## 本轮改动
+
+1. **WOA 通道标记为弃用**：`channels/woa.py` 顶部标注 deprecated；`config.example.yaml` 里 woa 默认禁用并注明；`INTEGRATION.md` 的 WOA 章节改为"已弃用"说明；README 状态/表格同步。
+2. **`CREDENTIALS.md` 重写**：去掉 WOA，聚焦飞书（webhook 或应用机器人）+ QQ（OneBot）+ 其余拍板项。
+3. 代码保留备用（WOA 实现与测试完整），随时可在拿到管理员授权后启用。
+
+## 第 46 轮实测结果
+
+- ✅ 102/102 单测通过（WOA 代码保留，仍全绿）
+- ✅ git 干净
+
+## 仍待你提供（飞书/QQ 真实联调）
+
+填 `CREDENTIALS.md`：飞书（webhook URL 或 app_id/app_secret）+ QQ（OneBot WS 地址/机器人号）+ 拍板项（默认工作目录、通知策略、是否装常驻、管理 API 是否外露）。
+
+---
+
 祝睡个好觉 🌙 明天见。

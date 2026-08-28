@@ -1,6 +1,6 @@
 # dsh-im-bridge
 
-Bridge **DeepSeek Harness (dsh)** agents to IM / collaboration tools (QQ, 飞书/Feishu, WOA, …), so that:
+Bridge **DeepSeek Harness (dsh)** agents to IM / collaboration tools (QQ, 飞书/Feishu, …), so that:
 
 * when an agent finishes a task, or needs your confirmation (a **question** / **approval**), the agent notifies you in your IM tool;
 * you can proactively send a message from your IM tool and the dsh agent on your machine will pick it up and work on it.
@@ -9,11 +9,11 @@ Cross-platform: Windows + Ubuntu (Python ≥ 3.10). 已在 Windows 和 Ubuntu(WS
 
 > ⚠️ 部署提示: 桥接要和 dsh 在**同一系统/网络**里。若在 WSL(Ubuntu)里跑桥接、dsh 在 Windows, WSL 的 `127.0.0.1` 不是 Windows 的, 连不上——需开 WSL mirrored 网络或让 dsh 绑定非回环地址(见 REPORT.md 第 10 轮)。
 
-> ⚠️ 状态: 第一个可运行的版本已经完成并通过端到端实测（见 [REPORT.md](REPORT.md)）。WOA 通道已按 WPS 协作协议实现（发送+HTTP 回调接收），待真实凭据联调。
+> ⚠️ 状态: 第一个可运行的版本已经完成并通过端到端实测（见 [REPORT.md](REPORT.md)）。当前联调目标：**飞书 + QQ**（WOA/WPS 协作因需管理员审核已弃用，代码保留备用）。
 >
-> 📘 **飞书 / QQ / WOA 的逐步联调步骤见 [INTEGRATION.md](INTEGRATION.md)**（建飞书应用、跑 NapCat 等，跟着做就能通）。
+> 📘 **飞书 / QQ 的逐步联调步骤见 [INTEGRATION.md](INTEGRATION.md)**（建飞书应用、跑 NapCat 等，跟着做就能通）。
 > 📋 **把凭据和拍板项一次给我：填 [CREDENTIALS.md](CREDENTIALS.md) 里的表发回即可。**
-> 需要真实账号才能联调飞书/QQ/WOA 的完整收发（WOA 通道已按 WPS 协作协议实现）。
+> 需要真实账号才能联调飞书/QQ 的完整收发。
 
 ---
 
@@ -46,7 +46,7 @@ Cross-platform: Windows + Ubuntu (Python ≥ 3.10). 已在 Windows 和 Ubuntu(WS
 | `channels/feishu.py` | 飞书: 自定义机器人 webhook(仅发送) + 应用机器人(收发, 事件长连接, AES 解密) |
 | `channels/qq.py` | QQ: OneBot11 反向 WebSocket(NapCat / Lagrange / LLOneBot / go-cqhttp) |
 | `channels/webhook.py` | 通用本地 HTTP 入站端点, 任何工具都能 POST 消息进来 |
-| `channels/woa.py` | WPS 协作 (WOA/WPS365): 发送(`/v7/messages/create`+KSO1 签名) + HTTP 回调接收(验签+AES 解密) |
+| `channels/woa.py` | WPS 协作 (WOA) — ⚠️ 已弃用(需管理员审核)，代码保留备用 |
 | `server.py` | 本地管理 HTTP API: `/status`(含待确认问题内容) `/prompt` `/message` `/answer` `/approval` `/bind` `/attachment` |
 
 ### 会话绑定
