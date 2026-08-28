@@ -28,6 +28,7 @@
    - `im:message`(读取接收消息)
    - `im:message:send_as_bot`(以机器人身份发消息)
 3. **事件订阅**: 选择"长连接(WebSocket)"模式; 添加事件 `im.message.receive_v1`(接收消息)。
+   - ⚠️ **先别点保存**：长连接模式保存时会校验"是否有在线长连接客户端"。请先按第 5 步配好桥接并**启动桥接**（它会主动连飞书长连接），再回到后台点保存，否则报"无在线长连接"。
    - 若开启事件加密, 复制 `Encrypt Key`。
 4. 拿到 `App ID` / `App Secret`。
 5. 配置:
@@ -40,7 +41,8 @@
        # encryptKey: "xxxx"     # 仅当你在事件订阅里开了加密
        receiveChatTypes: ["p2p", "group"]
    ```
-6. 把机器人拉进你的群(或直接私聊机器人), 群里 @机器人 / 私聊发消息即可驱动 dsh。
+6. 启动桥接 `dsh-im-bridge --config config.yaml --log-file bridge.log`，日志出现 `feishu ws endpoint: ...` 说明长连接已连上；此时回飞书后台**保存**事件订阅配置。
+7. 把机器人拉进你的群(或直接私聊机器人), 群里 @机器人 / 私聊发消息即可驱动 dsh。
    - 首次发消息会自动建一个 dsh 会话并绑定; 之后该会话的完成/确认都会推回来。
 
 **自测**: 启动桥接(`dsh-im-bridge --config config.yaml --log-file bridge.log`), 日志出现 `feishu long-connection endpoint: ...` 说明连上了。然后在群里发一句话看是否触发 dsh。
