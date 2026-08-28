@@ -14,3 +14,4 @@ config.yaml
 .dsh-im-bridge/
 e2e-output.log
 e2e-state.json
+bridge.log
