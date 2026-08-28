@@ -10,7 +10,9 @@ python scripts\verify_all.py --auto 4 --pytest   # Ubuntu 用 python3 scripts/ve
 看到 "✅ 全部通过" 就说明程序在你机器上是好的。
 
 **2) 提供凭据 / 拍板（回复给我即可）**
-- **WOA（WPS 协作）**：在 [WPS 开放平台](https://open.wps.cn/)（或 [jp-open.wps.com](https://jp-open.wps.com/)）建内部企业应用、开机器人消息能力、选 **HTTP 回调模式**，给我：**App ID**、**Secret Key**、Encrypt Key（若有）、**API 地址**（日本平台的实际 apiUrl）。还有：**回调地址怎么让 WPS 访问到**（公网 IP？内网穿透？）。
+> 最快方式：填 [CREDENTIALS.md](CREDENTIALS.md) 里的表，一次性发给我，我就把所有通道配好联调。
+
+- **WOA（WPS 协作）**：在 [WPS 开放平台](https://open.wps.cn/)（或 [jp-open.wps.com](https://jp-open.wps.com/)）建内部企业应用、开机器人消息能力、选 **HTTP 回调模式**，给我：**App ID**、**Secret Key**、Encrypt Key（若有）、**API 地址**（日本平台的实际 apiUrl）。还有：**回调地址怎么让 WPS 访问到**（公网 IP？内网穿透？还是用 `wps_relay.py` 公网中继？）。
 - **飞书**：用自定义机器人（仅收通知）还是应用机器人（双向）？后者给我 app_id/app_secret。
 - **QQ**：用哪个协议端（NapCat 等）？WS 地址 + 机器人号。
 - **其余**：默认工作目录、通知策略（现在=最终回答+工具结果+完成+确认）、是否装常驻服务、管理 API 是否外露。
