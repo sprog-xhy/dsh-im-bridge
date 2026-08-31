@@ -18,6 +18,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 from pathlib import Path
 from typing import Any, Optional
 
@@ -206,6 +207,12 @@ class BridgeHub:
             await self._handle_command(message, key, text)
             return
 
+        # Direct replies answer a pending question / approval first (a direct
+        # "1" must answer the open question, not become a new prompt — that
+        # used to leave the question hanging and leak the number to dsh).
+        if await self._try_direct_answer(message, key, text):
+            return
+
         binding = self.bindings.get(key)
         is_new_binding = False
         if binding is None:
@@ -248,6 +255,86 @@ class BridgeHub:
                     f"已绑定到 dsh 会话 {binding.session_id}，现在开始干活 🚀",
                     kind="notify",
                 )
+
+    # -- direct answers to pending questions / approvals ------------------
+    async def _try_direct_answer(self, message: InboundMessage, key: str, text: str) -> bool:
+        """Consume a plain (non-slash) reply as an answer to a pending
+        question / approval on this conversation. Returns True when consumed.
+
+        A direct reply while a question is pending is ALWAYS treated as the
+        answer (same mental model as the dsh GUI): a bare "1", "1,2", an exact
+        option label, a free-text custom answer, or 「跳过/取消」.
+        """
+        pending_q = self._first_pending(key, "question")
+        if pending_q is not None:
+            await self._direct_question_answer(message, key, text, pending_q)
+            return True
+        pending_a = self._first_pending(key, "approval")
+        if pending_a is not None:
+            await self._direct_approval_answer(message, key, text, pending_a)
+            return True
+        return False
+
+    async def _direct_question_answer(
+        self, message: InboundMessage, key: str, text: str, pending: dict
+    ) -> None:
+        low = text.strip().lower()
+        if low in ("跳过", "取消", "skip", "cancel"):
+            ok = self.client.cancel_question(pending["rpc_id"], pending["session_id"])
+            await self._send(
+                message.channel,
+                message.conversation_id,
+                "已取消 ✅" if ok else "取消失败（可能已过期）",
+            )
+            if ok:
+                self.pending.pop(pending["rpc_id"], None)
+            return
+        answers = parse_direct_answer(text, questions=pending.get("questions"))
+        if answers is None:
+            await self._send(
+                message.channel,
+                message.conversation_id,
+                "无法识别答案，请回复选项序号（如 1 或 1,2）或选项文字。",
+                kind="error",
+            )
+            return
+        ok = self.client.answer_question(
+            pending["rpc_id"], pending["session_id"], answers
+        )
+        await self._send(
+            message.channel,
+            message.conversation_id,
+            "答案已提交 ✅" if ok else "答案提交失败（可能已过期）",
+        )
+        if ok:
+            self.pending.pop(pending["rpc_id"], None)
+
+    async def _direct_approval_answer(
+        self, message: InboundMessage, key: str, text: str, pending: dict
+    ) -> None:
+        low = text.strip().lower()
+        if low in ("允许", "同意", "allow", "approve", "yes"):
+            outcome = "allowed-once"
+        elif low in ("拒绝", "不同意", "reject", "deny", "no"):
+            outcome = "rejected"
+        else:
+            await self._send(
+                message.channel,
+                message.conversation_id,
+                "请回复「允许」或「拒绝」。",
+                kind="error",
+            )
+            return
+        ok = self.client.resolve_approval(
+            pending["rpc_id"], pending["session_id"], pending["approval_id"], outcome
+        )
+        await self._send(
+            message.channel,
+            message.conversation_id,
+            "已允许 ✅" if ok and outcome == "allowed-once" else ("已拒绝 ✅" if ok else "审批失败（可能已过期）"),
+        )
+        if ok:
+            self.pending.pop(pending["rpc_id"], None)
 
     async def _auto_bind(self, channel: str, conversation_id: str) -> SessionBinding:
         payload: dict = {}
@@ -475,8 +562,6 @@ class BridgeHub:
             await self._cmd_attach(message, key, arg)
         elif cmd in ("new",):
             await self._cmd_new(message)
-        elif cmd == "answer":
-            await self._cmd_answer(message, key, arg)
         elif cmd == "cancel-question":
             await self._cmd_cancel_question(message, key)
         elif cmd == "cancel":
@@ -580,29 +665,6 @@ class BridgeHub:
             await self._send(message.channel, message.conversation_id, f"新建会话失败: {exc}", kind="error")
             return
         await self._send(message.channel, message.conversation_id, f"已新建并绑定会话 {binding.session_id}")
-
-    async def _cmd_answer(self, message: InboundMessage, key: str, arg: str) -> None:
-        pending = self._first_pending(key, "question")
-        if pending is None:
-            await self._send(message.channel, message.conversation_id, "当前没有待确认的问题。", kind="error")
-            return
-        answers = parse_answer_arg(arg, questions=pending.get("questions"))
-        if answers is None:
-            await self._send(
-                message.channel,
-                message.conversation_id,
-                "格式: /answer 1:选项A,2:自定义文本 （用逗号分隔多个问题的答案）",
-                kind="error",
-            )
-            return
-        ok = self.client.answer_question(pending["rpc_id"], pending["session_id"], answers)
-        await self._send(
-            message.channel,
-            message.conversation_id,
-            "答案已提交 ✅" if ok else "答案提交失败（可能已过期）",
-        )
-        if ok:
-            self.pending.pop(pending["rpc_id"], None)
 
     async def _cmd_cancel_question(self, message: InboundMessage, key: str) -> None:
         pending = self._first_pending(key, "question")
@@ -857,6 +919,59 @@ def parse_answer_arg(arg: str, questions=None) -> Optional[list]:
                 continue
         answers.append({"id": qid, "selected": [], "custom": value})
     return answers or None
+
+
+def parse_direct_answer(text: str, questions=None) -> Optional[list]:
+    """Parse a plain chat reply (no /answer prefix) as answers to a pending
+    question set.
+
+    Since the bridge treats any direct reply while a question is pending as the
+    answer, this parser accepts the natural chat forms:
+
+    * single question: ``1`` / ``1,2`` (option index, 1-based), an exact option
+      label, or any free text as a custom answer;
+    * multiple questions: the explicit ``1:答案,2:答案`` form (same grammar as
+      the old ``/answer``), falling back to the first question when the reply
+      is not in that form.
+
+    Returns a list of answer item dicts, or None when it cannot be mapped onto
+    the given question set (e.g. an out-of-range option index).
+    """
+    if not text or not text.strip():
+        return None
+    text = text.strip()
+    items = list(questions) if questions else ()
+
+    # explicit multi-question form "1:答案,2:答案"
+    if ":" in text:
+        return parse_answer_arg(text, questions=items)
+
+    if len(items) == 1:
+        q = items[0]
+        labels = [opt.get("label", "") for opt in (q.options or ())]
+        # numeric option selection "1" / "1,2" / "1 2"
+        numbers = re.split(r"[,，、\s]+", text)
+        if numbers and all(part.isdigit() for part in numbers if part):
+            selected = []
+            for part in numbers:
+                idx = int(part)
+                if idx < 1 or idx > len(labels):
+                    return None  # out of range
+                selected.append(labels[idx - 1])
+            if selected:
+                return [{"id": q.id, "selected": selected, "custom": ""}]
+        if text in labels:
+            return [{"id": q.id, "selected": [text], "custom": ""}]
+        return [{"id": q.id, "selected": [], "custom": text}]
+
+    # multiple questions without the explicit form: answer the first one
+    if items:
+        q = items[0]
+        labels = [opt.get("label", "") for opt in (q.options or ())]
+        if text in labels:
+            return [{"id": q.id, "selected": [text], "custom": ""}]
+        return [{"id": q.id, "selected": [], "custom": text}]
+    return None
 
 
 def find_missed_questions(events: list) -> list:

@@ -87,8 +87,7 @@ def render_question(q: QuestionRequest, *, include_header: bool = True) -> str:
                 lines.append(f"   - {label}{' — ' + desc if desc else ''}")
         if item.multi_select:
             lines.append("   (可多选)")
-    lines.append("\n请回复答案（例如：1 或选项文字 / 直接输入自定义答案），或回复「跳过」跳过该项，回复「取消」取消。")
-    lines.append("提示：也可通过 `/answer 1:选项A,2:自定义` 一次性作答。")
+    lines.append("\n请直接回复答案：选项序号（如 1 或 1,2）/ 选项文字 / 自定义答案，或回复「跳过」跳过、回复「取消」取消。")
     return "\n".join(lines)
 
 
@@ -108,13 +107,13 @@ def answer_help_text() -> str:
         "可用指令：\n"
         "  /status        查看桥接与 dsh 状态\n"
         "  /sessions      列出 dsh 会话\n"
-        "  /answer ...    回答待确认问题（/answer 1:选项A,2:自定义文本）\n"
         "  /cancel-question  取消当前待确认问题\n"
         "  /allow / /reject   允许/拒绝当前审批\n"
         "  /attach <会话ID>   把本会话绑定到指定 dsh 会话\n"
         "  /new            新建一个 dsh 会话并绑定\n"
         "  /cancel         中断当前绑定的 dsh 会话（例如它卡在等待确认上）\n"
-        "  /history [N]    拉取绑定会话最近 N 条记录\n"
+        "  /history [N]    拉取绑定会话最近 N 条记录\n\n"
+        "dsh 弹出问题/审批时，直接回复即可（如 1 / 选项文字 / 允许 / 拒绝），无需 /answer。\n"
     )
 
 
