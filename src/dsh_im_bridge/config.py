@@ -24,6 +24,7 @@ DEFAULT_CONFIG = {
         "webhook": {"enabled": True, "port": 8765},
         "feishu": {"enabled": False},
         "qq": {"enabled": False, "wsUrl": "ws://127.0.0.1:3001"},
+        "qq_official": {"enabled": False},
         "woa": {"enabled": False, "port": 8766},
     },
 }
@@ -89,6 +90,13 @@ class Config:
 
         if self.channels.get("qq") and not self.channels["qq"].get("wsUrl"):
             errors.append("qq: wsUrl is required (OneBot11 reverse-WebSocket endpoint)")
+
+        qqo = self.channels.get("qq_official") or {}
+        if qqo:
+            if not qqo.get("appId") or not qqo.get("appSecret"):
+                errors.append("qq_official: appId and appSecret are required (QQ 开放平台机器人应用)")
+            elif not str(qqo.get("appId", "")).isdigit():
+                errors.append("qq_official: appId must be the numeric AppID from q.qq.com")
 
         woa = self.channels.get("woa") or {}
         if woa:
@@ -169,6 +177,13 @@ def load_config(path: Optional[str] = None) -> Config:
             elif name == "qq":
                 clone["wsUrl"] = _env("QQ_WS_URL", clone.get("wsUrl", "ws://127.0.0.1:3001"))
                 clone["accessToken"] = _env("QQ_ACCESS_TOKEN", clone.get("accessToken", "")) or None
+            elif name == "qq_official":
+                clone["appId"] = _env("QQ_OFFICIAL_APP_ID", clone.get("appId", "")) or None
+                clone["appSecret"] = _env("QQ_OFFICIAL_APP_SECRET", clone.get("appSecret", "")) or None
+                clone["sandbox"] = _env("QQ_OFFICIAL_SANDBOX", str(clone.get("sandbox", "false"))) in (
+                    "1", "true", "yes", "on"
+                )
+                clone["baseUrl"] = _env("QQ_OFFICIAL_BASE_URL", clone.get("baseUrl", "")) or None
             elif name == "woa":
                 clone["appId"] = _env("WOA_APP_ID", clone.get("appId", "")) or None
                 clone["secretKey"] = _env("WOA_SECRET_KEY", clone.get("secretKey", "")) or None

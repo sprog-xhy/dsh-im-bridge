@@ -65,6 +65,16 @@ channels:
     # allowUsers: []          # empty/omitted = all private chats
     # selfId: "10001"         # the bot's own QQ number (to ignore echoes)
 
+  qq_official:
+    enabled: false
+    # QQ 开放平台官方机器人 API（q.qq.com），官方 WebSocket 长连接收发，无需跑 OneBot 协议端。
+    # 建好机器人应用后填 AppID / AppSecret；私聊(C2C)消息自动接入，用官方发送接口回复。
+    # appId: "1234567890"
+    # appSecret: "xxxx"
+    # sandbox: false           # true = 沙箱环境(sandbox.api.bot.qq.com)，false = 正式
+    # allowUsers: []           # 可选：只允许这些用户 openid 私聊（留空=全部）
+    # baseUrl: ""              # 可选：自定义 API 根地址（测试用），默认按 sandbox 决定
+
   woa:
     enabled: false
     # ⚠️ 已弃用：WPS 协作(WPS365)需要管理员审核，放弃使用。代码保留备用；如以后能用再启用。
