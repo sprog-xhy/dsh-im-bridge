@@ -215,6 +215,84 @@ async def test_send_c2c_ok_without_code_field(monkeypatch):
     await ch.send("openid_x", "hi")  # must not raise
 
 
+# -- markdown send (question/approval) ---------------------------------
+@pytest.mark.asyncio
+async def test_send_question_uses_markdown(monkeypatch):
+    """question/approval messages are sent as QQ markdown (msg_type=2)."""
+    ch = _make_channel()
+    sent = {}
+
+    def capture(url, json=None, headers=None, timeout=None):
+        if "/v2/users/" in url:
+            sent["json"] = json
+            return _FakeResp({"id": "ok"})
+        return _FakeResp({"access_token": "tok", "expires_in": "7200"})
+
+    monkeypatch.setattr("dsh_im_bridge.channels.qq_official.requests.post", capture)
+    await ch.send("openid_x", "❓ **需要你确认**", kind="question")
+    assert sent["json"]["msg_type"] == 2
+    assert sent["json"]["markdown"]["content"] == "❓ **需要你确认**"
+    assert "content" not in sent["json"] or not sent["json"].get("content")
+
+
+@pytest.mark.asyncio
+async def test_send_notify_stays_plain_text(monkeypatch):
+    """Non-question/approval messages stay as plain text even with sendMarkdown on."""
+    ch = _make_channel()
+    sent = {}
+
+    def capture(url, json=None, headers=None, timeout=None):
+        if "/v2/users/" in url:
+            sent["json"] = json
+            return _FakeResp({"id": "ok"})
+        return _FakeResp({"access_token": "tok", "expires_in": "7200"})
+
+    monkeypatch.setattr("dsh_im_bridge.channels.qq_official.requests.post", capture)
+    await ch.send("openid_x", "任务完成", kind="notify")
+    assert sent["json"]["msg_type"] == 0
+    assert sent["json"]["content"] == "任务完成"
+    assert "markdown" not in sent["json"]
+
+
+@pytest.mark.asyncio
+async def test_send_markdown_falls_back_to_text(monkeypatch):
+    """If the markdown send is rejected, fall back to plain text."""
+    ch = _make_channel()
+    calls = []
+
+    def capture(url, json=None, headers=None, timeout=None):
+        if "/v2/users/" in url:
+            calls.append(json)
+            if len(calls) == 1:
+                return _FakeResp({"err_code": 40034008, "message": "markdown参数有空值"}, status=400)
+            return _FakeResp({"id": "ok"})
+        return _FakeResp({"access_token": "tok", "expires_in": "7200"})
+
+    monkeypatch.setattr("dsh_im_bridge.channels.qq_official.requests.post", capture)
+    await ch.send("openid_x", "❓ **需要你确认**", kind="question")
+    assert len(calls) == 2
+    assert calls[0]["msg_type"] == 2  # first attempt: markdown
+    assert calls[1]["msg_type"] == 0  # fallback: plain text
+    assert calls[1]["content"] == "❓ **需要你确认**"
+
+
+@pytest.mark.asyncio
+async def test_send_markdown_disabled(monkeypatch):
+    """sendMarkdown=false always sends plain text."""
+    ch = _make_channel(sendMarkdown=False)
+    sent = {}
+
+    def capture(url, json=None, headers=None, timeout=None):
+        if "/v2/users/" in url:
+            sent["json"] = json
+            return _FakeResp({"id": "ok"})
+        return _FakeResp({"access_token": "tok", "expires_in": "7200"})
+
+    monkeypatch.setattr("dsh_im_bridge.channels.qq_official.requests.post", capture)
+    await ch.send("openid_x", "❓ **需要你确认**", kind="question")
+    assert sent["json"]["msg_type"] == 0
+
+
 # -- receive ------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_c2c_event_mapping():
