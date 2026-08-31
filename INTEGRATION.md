@@ -136,4 +136,4 @@ powershell -ExecutionPolicy Bypass -File scripts\install-windows-task.ps1
 | QQ (OneBot) 连不上 | OneBot 协议端没跑 / wsUrl 端口不对 / 要 access_token |
 | 收不到任何通知 | 先 `--check`; 看 `--log-file`; 确认该会话已绑定(`/attach` 或首条消息自动绑定) |
 
-> 命令速记: 在聊天里 `/help` 看指令(`/answer` `/allow` `/cancel` `/history` `/sessions` `/attach` `/new` 等)。
+> 命令速记: 在聊天里 `/help` 看指令(`/allow` `/reject` `/cancel` `/history` `/sessions` `/attach` `/new` 等)；dsh 弹出问题/审批时**直接回复**即可（如 `1` / 选项文字 / `允许` / `拒绝`）。

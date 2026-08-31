@@ -7,7 +7,7 @@ Runs the REAL BridgeHub + ConsoleChannel against a SIMULATED dsh wire that:
 3. waits while you answer (hub -> /api/respond);
 4. emits question/resolved, a final assistant/message and turn/end.
 
-You reply on the terminal with the chat commands (e.g. `/answer 1:方案A`), just
+You reply on the terminal with the chat commands (e.g. `1` selects 方案A), just
 as you would in QQ/Feishu. Optionally auto-answers after a few seconds.
 
 Usage:  python scripts/demo_confirmation.py [--auto 5]
@@ -270,8 +270,8 @@ async def main() -> int:
     if args.auto > 0:
         async def auto_answer():
             await asyncio.sleep(args.auto)
-            print(f"\n[自动演示] {args.auto}s 后自动回答: /answer 1:方案A\n")
-            await chan.feed_text("/answer 1:方案A")
+            print(f"\n[自动演示] {args.auto}s 后自动回复: 1（选中方案A）\n")
+            await chan.feed_text("1")
         asyncio.create_task(auto_answer())
 
     await asyncio.sleep(0.6)  # let the mux stream connect first

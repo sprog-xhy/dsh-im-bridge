@@ -41,7 +41,7 @@ Cross-platform: Windows + Ubuntu (Python ≥ 3.10). 已在 Windows 和 Ubuntu(WS
 | 模块 | 说明 |
 |---|---|
 | `dsh_client.py` | dsh `/api` 客户端: unary RPC (`session.prompt` / `create` / `history` / `attachment` / …), `events.mux` WebSocket 事件流(自动重连+退避), `/api/respond` 应答问题/审批 |
-| `hub.py` | 消息路由: IM→会话 (`session.prompt`), 会话事件→IM 通知, 问题/审批转发与 `/answer` `/allow` `/reject` 指令, 发送重试, 重启补发, 启动通知 |
+| `hub.py` | 消息路由: IM→会话 (`session.prompt`), 会话事件→IM 通知, 问题/审批**直接回复**应答(如 `1` / 选项文字 / `允许` / `拒绝`), 发送重试, 重启补发, 启动通知 |
 | `channels/console.py` | 本地终端通道(也是 demo/测试通道) |
 | `channels/feishu.py` | 飞书: 自定义机器人 webhook(仅发送) + 应用机器人(收发, 事件长连接, AES 解密) |
 | `channels/qq.py` | QQ: OneBot11 反向 WebSocket(NapCat / Lagrange / LLOneBot / go-cqhttp) |
@@ -57,7 +57,7 @@ Cross-platform: Windows + Ubuntu (Python ≥ 3.10). 已在 Windows 和 Ubuntu(WS
 * 首次发消息自动建一个 dsh 会话并绑定;
 * `/attach <会话ID>` 绑定到已有会话; `/new` 新建并绑定;
 * 会话绑定后, 该 dsh 会话的 `assistant/message`、`tool/result`(错误/有输出)、`turn/end`(任务完成) 会推送到 IM;
-* `question/requested` / `approval/requested` 会推送到 IM, 用 `/answer` `/allow` `/reject` 或 HTTP API 应答;
+* `question/requested` / `approval/requested` 会推送到 IM, **直接回复即可应答**（如 `1` / `1,2` / 选项文字 / `跳过` / `取消` / `允许` / `拒绝`），或用 HTTP API 应答;
 * `/cancel` 中断绑定会话(例如它卡在等待确认上), `/history [N]` 拉取最近记录;
 * 桥接重启后, dsh 会重新推送未答复的问题(只要会话已绑定), 桥接会自动重新捕获并通知你; 另有兜底检测提醒"离线期间未答复的确认请求", 可用 `/cancel` 或 `/history` 处理。
 
@@ -127,7 +127,7 @@ python scripts/demo_woa.py                     # WOA(WPS 协作)通道端到端�
 python scripts/demo_im.py                      # 飞书 + QQ 端到端演示(假服务器，无凭据预览)
 ```
 
-用模拟的 wire 跑通"agent 提问 → 你回答 `/answer 1:方案A` → agent 继续"的完整闭环(真实 Hub/通道代码)。`demo_im.py` 演示飞书(长连接)/QQ(OneBot WS)消息 → 桥接 → dsh → 回复发回平台的全链路。
+用模拟的 wire 跑通"agent 提问 → 你直接回复 `1` → agent 继续"的完整闭环(真实 Hub/通道代码)。`demo_im.py` 演示飞书(长连接)/QQ(OneBot WS)消息 → 桥接 → dsh → 回复发回平台的全链路。
 
 ### 常驻运行 (Windows / Ubuntu)
 
