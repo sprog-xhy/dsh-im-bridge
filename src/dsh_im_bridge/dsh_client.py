@@ -122,6 +122,15 @@ class DshClient:
     def list_workspaces(self) -> list:
         return (self.call("workspace.list", {}) or {}).get("items", [])
 
+    def list_archived_session_ids(self) -> list:
+        """Registry-global archive set: session ids hidden from grouping surfaces.
+
+        ``workspace.list`` returns this in addition to the workspace tree; the
+        dsh GUI uses it to hide archived sessions. ``session.list`` does NOT
+        filter archived sessions, so callers must exclude these themselves.
+        """
+        return (self.call("workspace.list", {}) or {}).get("archivedSessionIds", [])
+
     def create_session(
         self,
         cwd: Optional[str] = None,

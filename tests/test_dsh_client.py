@@ -79,6 +79,10 @@ def fake_api():
             },
             "data": "iVBORw0KGgo=",
         },
+        "workspace.list": {
+            "items": [{"workspaceId": "w-1", "path": "/tmp", "sessionIds": ["s-1"]}],
+            "archivedSessionIds": ["s-arch"],
+        },
     }
     srv = ThreadingHTTPServer(("127.0.0.1", 0), handler)
     thread = threading.Thread(target=srv.serve_forever, daemon=True)
@@ -93,6 +97,13 @@ def test_call_unary(fake_api):
     assert client.describe()["version"] == "0.0.1"
     assert client.list_sessions()[0]["sessionId"] == "s-1"
     assert client.create_session()["sessionId"] == "s-new"
+
+
+def test_archived_session_ids(fake_api):
+    client = DshClient(base_url=f"http://127.0.0.1:{fake_api}")
+    assert client.list_archived_session_ids() == ["s-arch"]
+    # session.list does NOT filter archived sessions (caller must do so)
+    assert [i["sessionId"] for i in client.list_sessions()] == ["s-1"]
 
 
 def test_attachment(fake_api):
