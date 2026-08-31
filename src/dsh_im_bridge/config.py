@@ -183,6 +183,9 @@ def load_config(path: Optional[str] = None) -> Config:
                 clone["sandbox"] = _env("QQ_OFFICIAL_SANDBOX", str(clone.get("sandbox", "false"))) in (
                     "1", "true", "yes", "on"
                 )
+                clone["sendMarkdown"] = _env("QQ_OFFICIAL_SEND_MARKDOWN", str(clone.get("sendMarkdown", "true"))) not in (
+                    "0", "false", "no", "off"
+                )
                 clone["baseUrl"] = _env("QQ_OFFICIAL_BASE_URL", clone.get("baseUrl", "")) or None
             elif name == "woa":
                 clone["appId"] = _env("WOA_APP_ID", clone.get("appId", "")) or None

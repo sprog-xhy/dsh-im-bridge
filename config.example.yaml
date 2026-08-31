@@ -72,6 +72,7 @@ channels:
     # appId: "1234567890"
     # appSecret: "xxxx"
     # sandbox: false           # true = 沙箱环境(sandbox.api.bot.qq.com)，false = 正式
+    # sendMarkdown: true       # 问题/审批用 QQ markdown(msg_type=2) 渲染；失败自动回退纯文本
     # allowUsers: []           # 可选：只允许这些用户 openid 私聊（留空=全部）
     # baseUrl: ""              # 可选：自定义 API 根地址（测试用），默认按 sandbox 决定
 
