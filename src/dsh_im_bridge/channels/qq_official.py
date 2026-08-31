@@ -25,6 +25,8 @@ Config keys (under ``channels.qq_official``):
 * ``sandbox`` (bool, default false) — sandbox vs. production API root
 * ``allowUsers`` (list of openid, optional) — only allow these private chats
 * ``baseUrl`` (str, optional) — override the API root (testing)
+* ``sendMarkdown`` (bool, default true) — render question/approval messages
+  as QQ markdown (msg_type=2), falling back to plain text on send errors
 """
 
 from __future__ import annotations
@@ -92,6 +94,9 @@ class QqOfficialChannel(Channel):
         self.sandbox = bool(config.get("sandbox", False))
         self.allow_users = config.get("allowUsers")  # None = all
         self.base_url = str(config.get("baseUrl") or "").rstrip("/")
+        # question/approval messages are rich markdown; QQ renders them when
+        # sent as msg_type=2. Default on; falls back to plain text on error.
+        self.send_markdown = bool(config.get("sendMarkdown", True))
 
         self._token: Optional[str] = None
         self._token_expires_at = 0.0
@@ -176,17 +181,37 @@ class QqOfficialChannel(Channel):
 
     # -- send --------------------------------------------------------------
     async def send(self, conversation_id: str, text: str, kind: str = "notify") -> None:
-        await asyncio.to_thread(self._send_c2c, conversation_id, text)
+        await asyncio.to_thread(self._send_c2c, conversation_id, text, kind)
 
-    def _send_c2c(self, openid: str, text: str) -> None:
+    def _send_c2c(self, openid: str, text: str, kind: str = "notify") -> None:
+        # question/approval renders are markdown; use msg_type=2 so QQ renders
+        # bold/list markup instead of showing the raw syntax. Fall back to
+        # plain text if the markdown send is rejected.
+        if self.send_markdown and kind in ("question", "approval"):
+            try:
+                self._post_message(openid, text, markdown=True)
+                return
+            except QqOfficialError as exc:
+                self.log.warning("qq_official markdown send failed, falling back to text: %s", exc)
+        self._post_message(openid, text, markdown=False)
+
+    def _post_message(self, openid: str, text: str, markdown: bool) -> None:
         token = self._access_token()
         url = f"{self.api_root()}/v2/users/{openid}/messages"
         self._next_msg_seq += 1
-        payload = {
-            "content": text,
-            "msg_type": 0,
-            "msg_seq": self._next_msg_seq,  # 与 msg_id 联合去重（官方默认从 1 递增）
-        }
+        if markdown:
+            # msg_type=2 (Markdown); content must be empty when markdown is set
+            payload = {
+                "msg_type": 2,
+                "markdown": {"content": text},
+                "msg_seq": self._next_msg_seq,
+            }
+        else:
+            payload = {
+                "content": text,
+                "msg_type": 0,
+                "msg_seq": self._next_msg_seq,  # 与 msg_id 联合去重（官方默认从 1 递增）
+            }
         msg_id = self._last_msg_id.get(openid)
         if msg_id:
             payload["msg_id"] = msg_id  # passive reply window (helps dedupe/delivery)
