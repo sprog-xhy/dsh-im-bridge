@@ -45,6 +45,7 @@ Cross-platform: Windows + Ubuntu (Python ≥ 3.10). 已在 Windows 和 Ubuntu(WS
 | `channels/console.py` | 本地终端通道(也是 demo/测试通道) |
 | `channels/feishu.py` | 飞书: 自定义机器人 webhook(仅发送) + 应用机器人(收发, 事件长连接, AES 解密) |
 | `channels/qq.py` | QQ: OneBot11 反向 WebSocket(NapCat / Lagrange / LLOneBot / go-cqhttp) |
+| `channels/qq_official.py` | QQ: **官方开放平台机器人 API**(q.qq.com, 官方 WebSocket 长连接收发 C2C 私聊, 无需协议端) |
 | `channels/webhook.py` | 通用本地 HTTP 入站端点, 任何工具都能 POST 消息进来 |
 | `channels/woa.py` | WPS 协作 (WOA) — ⚠️ 已弃用(需管理员审核)，代码保留备用 |
 | `server.py` | 本地管理 HTTP API: `/status`(含待确认问题内容) `/prompt` `/message` `/answer` `/approval` `/bind` `/attachment` |
@@ -73,7 +74,7 @@ source .venv/bin/activate       # Ubuntu
 pip install -e .[dev]
 
 # 2) 配置
-cp config.example.yaml config.yaml   # 按需开启 feishu/qq 并填入凭据
+cp config.example.yaml config.yaml   # 按需开启 feishu/qq/qq_official 并填入凭据
 cp .env.example .env                 # 或把凭据放进 .env(启动时自动读取)
 
 # 3) 全量自检（推荐先跑一次；加 --pytest 连单测一起跑 = 发布体检）
@@ -87,6 +88,7 @@ dsh-im-bridge --config config.yaml --log-file bridge.log   # 记录日志到文�
 # 4b) 联调真实通道后，先用 --test-notify 发一条测试消息确认通道已就绪
 dsh-im-bridge --config config.yaml --test-notify feishu             # 发到飞书群
 dsh-im-bridge --config config.yaml --test-notify qq --notify-target group:12345
+dsh-im-bridge --config config.yaml --test-notify qq_official --notify-target <openid>
 
 # 管理 API: http://127.0.0.1:8764/status
 ```

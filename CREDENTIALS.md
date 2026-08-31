@@ -20,9 +20,21 @@ FEISHU_APP_SECRET = ?
 FEISHU_ENCRYPT_KEY = ?   # 若事件订阅开了加密
 ```
 
-## 2. QQ（主通道）
+## 2. QQ（主通道，二选一）
 
-需要一个 OneBot11 协议端（NapCat / Lagrange / LLOneBot / go-cqhttp），用你的 QQ 小号跑起来，开 **WebSocket 服务器** 模式：
+### 方式 A：官方开放平台机器人 API（推荐，无需协议端）
+
+用 [q.qq.com](https://q.qq.com) 的官方机器人应用，桥接直接连官方 WebSocket 长连接收发 C2C 私聊：
+```
+QQ_OFFICIAL_APP_ID = ?        # 纯数字 AppID（q.qq.com 应用凭证）
+QQ_OFFICIAL_APP_SECRET = ?    # AppSecret
+QQ_OFFICIAL_SANDBOX = false   # true=沙箱(sandbox.api.bot.qq.com)，false=正式
+QQ_OFFICIAL_ALLOW_USERS = []  # 可选，只允许的 openid，留空=全部
+```
+
+### 方式 B：OneBot11 协议端（备选）
+
+需要跑一个 OneBot11 协议端（NapCat / Lagrange / LLOneBot / go-cqhttp），用你的 QQ 小号跑起来，开 **WebSocket 服务器** 模式：
 ```
 QQ_WS_URL = ?            # 如 ws://127.0.0.1:3001
 QQ_ACCESS_TOKEN = ?      # 若设置了
