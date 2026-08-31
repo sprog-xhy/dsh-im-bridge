@@ -65,6 +65,29 @@ def test_validate_qq_missing_wsurl():
     assert any("wsUrl" in e for e in errors)
 
 
+def test_validate_qq_official_missing_creds():
+    c = _cfg(channels={"qq_official": {"enabled": True}})
+    errors, _ = c.validate()
+    assert any("appId and appSecret" in e for e in errors)
+
+
+def test_validate_qq_official_ok():
+    c = _cfg(
+        channels={"qq_official": {"enabled": True, "appId": "1905533507", "appSecret": "x"}}
+    )
+    errors, warnings = c.validate()
+    assert errors == []
+    assert warnings == []
+
+
+def test_validate_qq_official_non_numeric_appid():
+    c = _cfg(
+        channels={"qq_official": {"enabled": True, "appId": "cli_abc", "appSecret": "x"}}
+    )
+    errors, _ = c.validate()
+    assert any("numeric AppID" in e for e in errors)
+
+
 def test_validate_no_channels_warns():
     c = _cfg(channels={})
     _, warnings = c.validate()
