@@ -66,7 +66,8 @@ def test_render_question():
     assert "继续?" in text
     assert "是" in text
     assert "否" in text
-    assert "/answer" in text
+    assert "直接回复" in text
+    assert "/answer" not in text
 
 
 def test_render_approval():

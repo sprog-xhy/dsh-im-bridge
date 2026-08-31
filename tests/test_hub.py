@@ -295,7 +295,8 @@ async def test_include_reasoning_on_shows_reasoning(hub):
 
 
 @pytest.mark.asyncio
-async def test_question_forward_and_answer(hub):
+async def test_question_forward_and_direct_answer(hub):
+    """A plain chat reply (no /answer prefix) answers the pending question."""
     h, dsh = hub
     chan = RecordingChannel()
     h.register(chan)
@@ -311,10 +312,127 @@ async def test_question_forward_and_answer(hub):
     await h._on_frame(_frame_payload(payload))
     assert any("继续?" in t for _, t, k in chan.sent)
     assert "rq-1" in h.pending
-    # index 1 resolves to the real question id "q1", and "是" matches an option
-    await _inject(h, "/answer 1:是")
+    # a direct "1" selects option 1 ("是") — no /answer needed
+    await _inject(h, "1")
     assert dsh.answers == [("rq-1", "s-9", [{"id": "q1", "selected": ["是"], "custom": ""}])]
     assert "rq-1" not in h.pending
+    # ...and it must NOT also be forwarded as a prompt (that leaked the answer to dsh)
+    assert dsh.prompts == []
+
+
+@pytest.mark.asyncio
+async def test_direct_answer_by_label_and_custom(hub):
+    h, dsh = hub
+    chan = RecordingChannel()
+    h.register(chan)
+    from dsh_im_bridge.hub import SessionBinding
+
+    h._add_binding(SessionBinding("rec:c1", "s-9"))
+    payload = {
+        "type": "question/requested",
+        "rpcId": "rq-1",
+        "sessionId": "s-9",
+        "questions": [{"id": "q1", "question": "选哪个?", "options": [{"label": "方案A"}, {"label": "方案B"}]}],
+    }
+    await h._on_frame(_frame_payload(payload))
+    # exact label match
+    await _inject(h, "方案B")
+    assert dsh.answers[-1][2] == [{"id": "q1", "selected": ["方案B"], "custom": ""}]
+    # custom free-text answer (after a fresh question)
+    await h._on_frame(_frame_payload(payload))
+    await _inject(h, "我自己定")
+    assert dsh.answers[-1][2] == [{"id": "q1", "selected": [], "custom": "我自己定"}]
+
+
+@pytest.mark.asyncio
+async def test_direct_answer_cancel(hub):
+    h, dsh = hub
+    chan = RecordingChannel()
+    h.register(chan)
+    from dsh_im_bridge.hub import SessionBinding
+
+    h._add_binding(SessionBinding("rec:c1", "s-9"))
+    payload = {
+        "type": "question/requested",
+        "rpcId": "rq-1",
+        "sessionId": "s-9",
+        "questions": [{"id": "q1", "question": "继续?", "options": [{"label": "是"}]}],
+    }
+    await h._on_frame(_frame_payload(payload))
+    await _inject(h, "取消")
+    assert "rq-1" not in h.pending
+    assert dsh.answers == []
+    assert dsh.prompts == []
+
+
+@pytest.mark.asyncio
+async def test_direct_approval_allow_reject(hub):
+    h, dsh = hub
+    chan = RecordingChannel()
+    h.register(chan)
+    from dsh_im_bridge.hub import SessionBinding
+
+    h._add_binding(SessionBinding("rec:c1", "s-9"))
+    payload = {
+        "type": "approval/requested",
+        "rpcId": "ra-1",
+        "sessionId": "s-9",
+        "approvalId": "a-9",
+        "toolName": "bash",
+    }
+    await h._on_frame(_frame_payload(payload))
+    assert "ra-1" in h.pending
+    # direct "允许" resolves the approval
+    await _inject(h, "允许")
+    assert dsh.approvals == [("ra-1", "s-9", "a-9", "allowed-once")]
+    assert "ra-1" not in h.pending
+    # direct "拒绝" on a new approval
+    await h._on_frame(
+        _frame_payload(
+            {
+                "type": "approval/requested",
+                "rpcId": "ra-2",
+                "sessionId": "s-9",
+                "approvalId": "a-10",
+                "toolName": "bash",
+            }
+        )
+    )
+    await _inject(h, "拒绝")
+    assert dsh.approvals[-1] == ("ra-2", "s-9", "a-10", "rejected")
+    assert "ra-2" not in h.pending
+
+
+def test_parse_direct_answer():
+    from dsh_im_bridge.events import QuestionItem
+    from dsh_im_bridge.hub import parse_direct_answer
+
+    questions = [
+        QuestionItem(id="q1", question="?", options=({"label": "方案A"}, {"label": "方案B"}))
+    ]
+    assert parse_direct_answer("1", questions=questions) == [
+        {"id": "q1", "selected": ["方案A"], "custom": ""}
+    ]
+    assert parse_direct_answer("1,2", questions=questions) == [
+        {"id": "q1", "selected": ["方案A", "方案B"], "custom": ""}
+    ]
+    assert parse_direct_answer("方案B", questions=questions) == [
+        {"id": "q1", "selected": ["方案B"], "custom": ""}
+    ]
+    assert parse_direct_answer("随便定", questions=questions) == [
+        {"id": "q1", "selected": [], "custom": "随便定"}
+    ]
+    assert parse_direct_answer("3", questions=questions) is None  # out of range
+    assert parse_direct_answer("", questions=questions) is None
+    # multi-question explicit form still supported
+    multi = [
+        QuestionItem(id="q1", question="?"),
+        QuestionItem(id="q2", question="?"),
+    ]
+    assert parse_direct_answer("1:是,2:否", questions=multi) == [
+        {"id": "q1", "selected": [], "custom": "是"},
+        {"id": "q2", "selected": [], "custom": "否"},
+    ]
 
 
 @pytest.mark.asyncio
