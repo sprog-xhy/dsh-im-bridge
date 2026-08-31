@@ -12,6 +12,7 @@ def available_channels() -> dict:
     from .console import ConsoleChannel
     from .feishu import FeishuChannel
     from .qq import QQOneBotChannel
+    from .qq_official import QqOfficialChannel
     from .webhook import WebhookChannel
     from .woa import WoaChannel
 
@@ -19,6 +20,7 @@ def available_channels() -> dict:
         "console": ConsoleChannel,
         "feishu": FeishuChannel,
         "qq": QQOneBotChannel,
+        "qq_official": QqOfficialChannel,
         "webhook": WebhookChannel,
         "woa": WoaChannel,
     }
