@@ -133,10 +133,22 @@ python scripts/demo_im.py                      # 飞书 + QQ 端到端演示(假
 # Ubuntu: 一键装成 systemd 服务(登录/开机自启、崩溃自动重启)
 sudo ./scripts/install-systemd.sh /abs/path/to/dsh-im-bridge
 sudo journalctl -u dsh-im-bridge -f
-
-# Windows: 注册为登录自启计划任务
-powershell -ExecutionPolicy Bypass -File scripts\install-windows-task.ps1
 ```
+
+**Windows 整链路自启（dsh web + 桥接，推荐，无需管理员）：**
+
+`scripts/start-dsh-stack.ps1` 会在登录时**幂等**地拉起完整链路：检测 `:10010` 未运行就启动 dsh web → 等它就绪 → 检测 `:8764` 未运行就启动桥接（已运行的进程不受影响）。把它装进用户启动文件夹，登录即自动运行：
+
+```bash
+# 安装自启（在 Startup 文件夹放一个隐藏 VBS 启动器，登录静默运行）
+powershell -ExecutionPolicy Bypass -File scripts\install-startup.ps1
+# 手动测试一次（幂等，可重复运行）
+powershell -ExecutionPolicy Bypass -File scripts\start-dsh-stack.ps1
+# 移除自启
+powershell -ExecutionPolicy Bypass -File scripts\install-startup.ps1 -Unregister
+```
+
+> ⚠️ 计划任务方案 `install-windows-task.ps1` 需要管理员权限（注册登录计划任务）；非管理员机器上会报 Access denied，此时用上面的启动文件夹方案即可。
 
 手动前台运行: `scripts\run_bridge.ps1`(Windows) 或 `./scripts/run_bridge.sh`(Ubuntu)。
 
