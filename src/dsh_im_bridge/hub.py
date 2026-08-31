@@ -517,10 +517,40 @@ class BridgeHub:
             if not items:
                 await self._send(message.channel, message.conversation_id, "暂无 dsh 会话")
                 return
-            lines = ["**dsh 会话**"]
-            for item in items[:20]:
-                flag = "🟢" if item.get("running") else "⚪"
-                lines.append(f"  {flag} {item.get('sessionId')}  cwd={item.get('cwd')}")
+            # The dsh GUI hides archived sessions, nested subagent sessions and
+            # blank (empty-log) sessions from its top-level list; mirror that
+            # exactly. Blank sessions have no content yet, so they never appear.
+            try:
+                archived = set(self.client.list_archived_session_ids())
+            except DshError:
+                archived = set()
+            visible = [
+                it for it in items
+                if not session_is_archived(it, archived)
+                and not session_is_subagent(it)
+                and not it.get("blank")
+            ]
+            if not visible:
+                await self._send(message.channel, message.conversation_id, "没有可显示的会话（全部已归档/空白/为子会话）")
+                return
+            # Group by working directory, newest first within each group —
+            # same shape as the dsh GUI's workspace list (cwd + title, no ids).
+            groups: dict[str, list] = {}
+            for it in visible:
+                groups.setdefault(it.get("cwd") or "(未知目录)", []).append(it)
+            lines = [f"**dsh 会话**（{len(visible)} 个，已隐藏 {len(items) - len(visible)} 个归档/空白/子会话）"]
+            for cwd in sorted(groups, key=lambda c: str(c).lower()):
+                group = sorted(
+                    groups[cwd],
+                    key=lambda it: it.get("updatedAt") or 0,
+                    reverse=True,
+                )
+                lines.append(f"\n📁 {cwd}")
+                for it in group:
+                    flag = "🟢" if it.get("running") else "⚪"
+                    title = session_title(it)
+                    label = truncate(title, 80) if title else "(空白会话)"
+                    lines.append(f"  {flag} {label}")
             await self._send(
                 message.channel,
                 message.conversation_id,
@@ -737,6 +767,40 @@ class BridgeHub:
             path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
         except Exception:  # noqa: BLE001
             log.exception("failed to save bridge state to %s", path)
+
+
+def session_title(item: dict) -> str:
+    """Human-readable title dsh computes for a session (projections.values.title).
+
+    ``session.list`` items carry the same title the dsh GUI shows. Fall back to
+    the session id when the title is absent (e.g. brand-new blank sessions).
+    """
+    projections = item.get("projections") or {}
+    values = projections.get("values") or {}
+    title = values.get("title")
+    if title:
+        return str(title).strip()
+    return ""
+
+
+def session_is_archived(item: dict, archived: set) -> bool:
+    """True when a session.list item is in the registry-global archive set."""
+    return bool(item.get("sessionId") in archived)
+
+
+def session_is_subagent(item: dict) -> bool:
+    """True for nested subagent sessions the dsh GUI does not list at top level.
+
+    ``session.list`` marks subagent sessions with ``origin: "subagent"`` (the
+    only origin value the host emits). ``parentSessionId`` alone is NOT enough:
+    forked sessions (which the GUI still shows as indented rows) also carry it.
+    """
+    origin = item.get("origin")
+    if origin == "subagent":
+        return True
+    if isinstance(origin, dict) and origin.get("kind") == "subagent":
+        return True
+    return False
 
 
 def parse_answer_arg(arg: str, questions=None) -> Optional[list]:

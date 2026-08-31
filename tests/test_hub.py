@@ -8,7 +8,14 @@ from pathlib import Path
 import pytest
 
 from dsh_im_bridge.dsh_client import DshError
-from dsh_im_bridge.hub import BridgeHub, find_missed_questions, parse_answer_arg
+from dsh_im_bridge.hub import (
+    BridgeHub,
+    find_missed_questions,
+    parse_answer_arg,
+    session_is_archived,
+    session_is_subagent,
+    session_title,
+)
 from dsh_im_bridge.parser import parse_mux_frame
 from dsh_im_bridge.events import InboundMessage
 from dsh_im_bridge.channels.base import Channel
@@ -49,7 +56,33 @@ class FakeDsh:
         return {"version": "0.0.1", "cwd": "/tmp", "provider": "wps", "model": "m"}
 
     def list_sessions(self):
-        return [{"sessionId": "s-1", "running": False}]
+        return [
+            {
+                "sessionId": "s-1",
+                "running": False,
+                "cwd": "/tmp",
+                "updatedAt": 200,
+                "projections": {"values": {"title": "调研 dsh API"}},
+            },
+            {
+                "sessionId": "s-2",
+                "running": True,
+                "cwd": "/tmp",
+                "updatedAt": 100,
+                "projections": {"values": {"title": "写 README"}},
+            },
+            {"sessionId": "s-blank", "running": True, "cwd": "/work", "updatedAt": 300, "blank": True},
+            {"sessionId": "s-archived", "running": False, "cwd": "/old", "updatedAt": 50,
+             "projections": {"values": {"title": "已归档任务"}}},
+            {"sessionId": "sub-1", "running": False, "cwd": "/tmp", "updatedAt": 150,
+             "origin": "subagent", "parentSessionId": "s-1",
+             "projections": {"values": {"title": "子代理"}}},
+            {"sessionId": "s-bound-blank", "running": False, "cwd": "/work",
+             "updatedAt": 250, "blank": True},
+        ]
+
+    def list_archived_session_ids(self):
+        return ["s-archived"]
 
     def history(self, session_id, max_messages=50, before_seq=None):
         if session_id == "s-999":
@@ -339,7 +372,59 @@ async def test_sessions_command(hub):
     chan = RecordingChannel()
     h.register(chan)
     await _inject(h, "/sessions")
-    assert any("s-1" in t for _, t, k in chan.sent)
+    text = "\n".join(t for _, t, k in chan.sent)
+    # titled sessions show the human-readable title
+    assert "调研 dsh API" in text
+    assert "写 README" in text
+    # grouped under the working directory (cwd), like the dsh GUI
+    assert "📁 /tmp" in text
+    # blank, unbound sessions are hidden (like the dsh GUI hides empty-log sessions)
+    assert "📁 /work" not in text
+    assert "空白会话" not in text
+    # session ids are no longer shown in the listing
+    assert "s-1" not in text
+    assert "s-blank" not in text
+    # archived sessions are hidden entirely
+    assert "已归档任务" not in text
+    assert "s-archived" not in text
+    # subagent (nested) sessions are hidden from the top-level listing
+    assert "子代理" not in text
+    # a count line reports how many were hidden (2 visible of 6 total)
+    assert "已隐藏 4 个归档/空白/子会话" in text
+
+
+@pytest.mark.asyncio
+async def test_sessions_hides_bound_blank_session(hub):
+    """Even a session the user is bound to stays hidden while it is blank —
+    exactly like the dsh GUI hides all empty-log sessions."""
+    h, dsh = hub
+    chan = RecordingChannel()
+    h.register(chan)
+    await _inject(h, "/attach s-bound-blank")
+    await _inject(h, "/sessions")
+    # pick out the /sessions reply (the attach confirmation carries the raw id)
+    sessions = next(t for _, t, k in chan.sent if t.startswith("**dsh 会话**"))
+    assert "📁 /work" not in sessions
+    assert "空白会话" not in sessions
+    assert "s-bound-blank" not in sessions
+
+
+def test_session_title_helper():
+    assert session_title({"projections": {"values": {"title": " 调研 "}}}) == "调研"
+    assert session_title({"projections": {"values": {"title": None}}}) == ""
+    assert session_title({"projections": {}}) == ""
+    assert session_title({}) == ""
+
+
+def test_session_filter_helpers():
+    assert session_is_archived({"sessionId": "a"}, {"a"}) is True
+    assert session_is_archived({"sessionId": "a"}, {"b"}) is False
+    assert session_is_subagent({"sessionId": "x", "origin": "subagent"}) is True
+    assert session_is_subagent({"sessionId": "x", "origin": {"kind": "subagent"}}) is True
+    # a forked session with parentSessionId but no subagent origin is still shown
+    assert session_is_subagent({"sessionId": "x", "parentSessionId": "p"}) is False
+    assert session_is_subagent({"sessionId": "x", "origin": None}) is False
+    assert session_is_subagent({"sessionId": "x"}) is False
 
 
 @pytest.mark.asyncio

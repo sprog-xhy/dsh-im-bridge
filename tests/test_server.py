@@ -44,6 +44,9 @@ class FakeDsh:
     def list_sessions(self):
         return [{"sessionId": "s-1", "running": False}]
 
+    def list_archived_session_ids(self):
+        return []
+
     def history(self, session_id, max_messages=50, before_seq=None):
         return {"events": [], "hasMore": False}
 
