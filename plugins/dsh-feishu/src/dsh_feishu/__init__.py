@@ -1,0 +1,1 @@
+"""dsh-feishu plugin package."""
