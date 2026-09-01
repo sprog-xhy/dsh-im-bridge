@@ -28,28 +28,32 @@
 1. Python ≥ 3.10
 2. dsh web 已在本机运行（默认 `http://127.0.0.1:10010`）——桥接与 dsh 必须在同一台机器/网络
 
-### 方式 A：从源码安装（本仓库内）
+### 方式 A：从本仓库源码安装（推荐，当前可用）
+
+本插件依赖核心包 `dsh-im-bridge`，需先从仓库根安装核心，再安装插件：
 
 ```bash
-# 1) 进入本插件目录
-cd dsh-im-bridge/plugins/dsh-feishu
-
-# 2) 创建虚拟环境并安装（会自动拉取 dsh-im-bridge 核心依赖）
+# 1) 在仓库根安装核心（dsh-im-bridge）
+cd dsh-im-bridge
 python -m venv .venv
 .\.venv\Scripts\activate        # Windows
 source .venv/bin/activate       # Ubuntu
 pip install -e .
 
+# 2) 安装本插件
+pip install -e plugins/dsh-feishu
+
 # 3) 生成配置并填写飞书凭据（见下方配置教程）
+cd plugins/dsh-feishu
 cp config.example.yaml config.yaml
 ```
 
-> 如果你的 `dsh-im-bridge` 核心已通过 `pip install -e .` 装过，可直接 `pip install -e .` 本插件。
+### 方式 B：独立安装（无需 clone 整个仓库）
 
-### 方式 B：独立安装（不 clone 整个仓库）
+> 适用于 `dsh-im-bridge` 核心已发布到 PyPI/你的私有源之后：
 
 ```bash
-pip install dsh-im-bridge        # 核心（从 PyPI 或你的私有源）
+pip install dsh-im-bridge        # 核心（先装）
 pip install dsh-feishu           # 本插件
 dsh-feishu --help
 ```

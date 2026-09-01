@@ -27,19 +27,22 @@ Cross-platform: Windows + Ubuntu (Python ≥ 3.10). 已在 Windows 和 Ubuntu(WS
 | **dsh-qq 插件** | [`plugins/dsh-qq/`](plugins/dsh-qq/README.md) | 只把 dsh 桥接到 **QQ 官方开放平台机器人**（C2C 私聊），独立安装即用 | 只用 QQ 的人 |
 | **dsh-feishu 插件** | [`plugins/dsh-feishu/`](plugins/dsh-feishu/README.md) | 只把 dsh 桥接到**飞书应用机器人**，独立安装即用 | 只用飞书的人 |
 
-### 快速安装（两款插件各一行）
+### 快速安装（先装核心，再装你想用的插件）
 
 ```bash
-# 只装 QQ 插件（自动拉取 dsh-im-bridge 核心）
-pip install dsh-im-bridge && pip install dsh-qq
+# 在仓库根安装核心 dsh-im-bridge（插件都依赖它）
+pip install -e .
+
+# 只装 QQ 插件
+pip install -e plugins/dsh-qq
 dsh-qq --help
 
 # 只装飞书插件
-pip install dsh-im-bridge && pip install dsh-feishu
+pip install -e plugins/dsh-feishu
 dsh-feishu --help
 ```
 
-> 从本仓库源码安装：`cd plugins/dsh-qq && pip install -e .`（或 `plugins/dsh-feishu`）。
+> 核心发布到 PyPI 后，可用 `pip install dsh-im-bridge && pip install dsh-qq`（或 `dsh-feishu`）一步装好。
 
 ### 开发者平台配置教程（两款插件各自有完整教程）
 
