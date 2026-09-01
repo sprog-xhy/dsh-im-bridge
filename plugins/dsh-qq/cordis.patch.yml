@@ -1,0 +1,19 @@
+# dsh-qq bundle patch: register the QQ official open-platform bot as a
+# Cordis plugin row that bridges C2C private messages into dsh agents.
+#
+# Applies after @deepseek-ai/dsh-base (or your base layer). It inserts the
+# `dsh-qq` plugin row; the plugin itself opens the QQ WebSocket long
+# connection, routes inbound C2C messages into per-user dsh agents, and pushes
+# assistant replies / questions / approvals back to QQ.
+#
+# Credentials are resolved through the dsh credentials service by default
+# (see `appIdEnv` / `appSecretEnv`); you may also set them inline here.
+
+- insert:
+    - id: dsh-qq
+      name: 'dsh-qq'
+      config:
+        appIdEnv: QQ_OFFICIAL_APP_ID
+        appSecretEnv: QQ_OFFICIAL_APP_SECRET
+        sandbox: false
+        # allowUsers: []          # optional: only allow these user openids
