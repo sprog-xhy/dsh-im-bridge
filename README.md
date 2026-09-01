@@ -1,244 +1,104 @@
 # dsh-im-bridge
 
-Bridge **DeepSeek Harness (dsh)** agents to IM / collaboration tools (QQ, 飞书/Feishu, …), so that:
+[English](README.en.md) | 中文
 
-* when an agent finishes a task, or needs your confirmation (a **question** / **approval**), the agent notifies you in your IM tool;
-* you can proactively send a message from your IM tool and the dsh agent on your machine will pick it up and work on it.
+**dsh-im-bridge** 让 [DeepSeek Harness (dsh)](https://github.com/sprog-xhy/dsh-im-bridge) 和 QQ、飞书等 IM 工具互通：在 QQ / 飞书里发消息，就能指挥本机上的 dsh agent 干活；dsh 完成任务或需要你确认时，结果会自动推回 IM。
 
-Cross-platform: Windows + Ubuntu (Python ≥ 3.10). 已在 Windows 和 Ubuntu(WSL2, Python 3.12)双环境跑通全部单测与确认流程 demo。
-
-> ⚠️ 部署提示: 桥接要和 dsh 在**同一系统/网络**里。若在 WSL(Ubuntu)里跑桥接、dsh 在 Windows, WSL 的 `127.0.0.1` 不是 Windows 的, 连不上——需开 WSL mirrored 网络或让 dsh 绑定非回环地址(见 REPORT.md 第 10 轮)。
-
-> ⚠️ 状态: 第一个可运行的版本已经完成并通过端到端实测（见 [REPORT.md](REPORT.md)）。当前联调目标：**飞书 + QQ**（WOA/WPS 协作因需管理员审核已弃用，代码保留备用）。
->
-> 📘 **飞书 / QQ 的逐步联调步骤见 [INTEGRATION.md](INTEGRATION.md)**（建飞书应用、跑 NapCat 等，跟着做就能通）。
-> 📋 **把凭据和拍板项一次给我：填 [CREDENTIALS.md](CREDENTIALS.md) 里的表发回即可。**
-> 需要真实账号才能联调飞书/QQ 的完整收发。
+本项目包含**一款 Python 桥接程序**和**两款 dsh 官方规范插件**（`dsh-qq`、`dsh-feishu`），支持 Windows 与 Ubuntu。
 
 ---
 
-## 仓库组成：原程序 + 两款 dsh 官方规范插件
+## 快速选择
 
-本仓库包含一个**通用桥接程序**（原程序），以及两个**符合 DeepSeek Harness 插件规范的独立插件**（Node.js Cordis 插件，按 dsh 官方规范开发）：
-
-| 组件 | 位置 | 说明 | 面向用户 |
-|---|---|---|---|
-| **dsh-im-bridge（原程序）** | 仓库根 `src/dsh_im_bridge/` | 通用 Python 桥接：一个进程可同时接飞书 / QQ / Webhook / Console 等，支持多通道混跑 | 想用一个独立桥接进程接多个 IM 的人 |
-| **dsh-qq 插件** | [`plugins/dsh-qq/`](plugins/dsh-qq/README.md) | **dsh 官方规范插件**：把 dsh 桥接到 QQ 官方开放平台机器人（C2C 私聊），Node.js Cordis 插件 | 只用 QQ、按 dsh 插件方式装进 profile 的人 |
-| **dsh-feishu 插件** | [`plugins/dsh-feishu/`](plugins/dsh-feishu/README.md) | **dsh 官方规范插件**：把 dsh 桥接到飞书应用机器人，Node.js Cordis 插件 | 只用飞书、按 dsh 插件方式装进 profile 的人 |
-
-> 两款插件不是 pip 包，而是 **dsh 官方插件**（npm 包 + `dsh.bundle.patch` + `cordis.patch.yml`），与官方插件 `dsh-web-search-wps` 同一机制，装进 `~/.dsh/profiles/<name>` 的 `node_modules` 并在 `dsh.profile.bundles` 登记后生效。
-
-### 快速安装（两款插件，按 dsh 插件规范）
-
-```bash
-# 1) 把插件登记进你的 dsh profile（例如 web）
-cd ~/.dsh/profiles/web
-pnpm add link:<本仓库绝对路径>/plugins/dsh-qq
-pnpm add link:<本仓库绝对路径>/plugins/dsh-feishu
-```
-
-然后在 `~/.dsh/profiles/web/package.json` 的 `dsh.profile.bundles` 数组里加上 `"dsh-qq"` 与 `"dsh-feishu"`，**重启 dsh web** 即加载。
-
-> 发布到 npm/私有源后：`cd ~/.dsh/profiles/web && pnpm add dsh-qq dsh-feishu`（同样登记 bundles）。
-
-### 开发者平台配置教程（两款插件各自有完整教程）
-
-- **QQ**：见 [`plugins/dsh-qq/README.md`](plugins/dsh-qq/README.md) —— 在 [q.qq.com](https://q.qq.com) 建机器人应用、拿 AppID/AppSecret、开启 C2C 私聊、沙箱/正式切换、加好友验证；凭据经 dsh 凭据/环境解析。
-- **飞书**：见 [`plugins/dsh-feishu/README.md`](plugins/dsh-feishu/README.md) —— 在[飞书开放平台](https://open.feishu.cn/app)建应用、开 `im:message` 权限、配事件订阅长连接、拿 AppID/AppSecret；凭据经 dsh 凭据/环境解析。
-
-**核心运行机制两款插件相同**：都是 dsh 规范插件，在 dsh 进程内用 `ctx.agents.create` + `agent.followup` 把 IM 消息注入 dsh 会话，并订阅 `session/event` 把回复/完成/失败推回 IM——不依赖本仓库的 Python 桥接进程，也不用 pip。
-
----
-
-## 架构
-
-```
-   QQ / Feishu / WOA / 任意工具
-            │  (channel adapters)
-            ▼
-   ┌──────────────────────┐        loopback /api      ┌────────────────────────────┐
-   │  BridgeHub (hub.py)  │ ◄─────  unary RPC + WS ──► │   dsh web (在你的机器上)     │
-   │  - 会话绑定/路由       │        events.mux/respond  │   session.prompt / question │
-   │  - 问题/审批转发与应答  │                             │   / approval / turn/end    │
-   └──────────┬───────────┘                             └────────────────────────────┘
-              │
-   ┌──────────▼───────────┐
-   │ BridgeServer (server.py)  本地管理 HTTP API (状态/注入/应答)   │
-   └──────────────────────┘
-```
-
-关键点: **桥接进程与 dsh 在同一台机器上**, 通过 dsh web 的回环 `/api` 协议通信(不需要改 dsh 本体, 不需要浏览器)。
-
-### 已实现
-
-| 模块 | 说明 |
+| 你的需求 | 推荐方案 |
 |---|---|
-| `dsh_client.py` | dsh `/api` 客户端: unary RPC (`session.prompt` / `create` / `history` / `attachment` / …), `events.mux` WebSocket 事件流(自动重连+退避), `/api/respond` 应答问题/审批 |
-| `hub.py` | 消息路由: IM→会话 (`session.prompt`), 会话事件→IM 通知, 问题/审批**直接回复**应答(如 `1` / 选项文字 / `允许` / `拒绝`), 发送重试, 重启补发, 启动通知 |
-| `channels/console.py` | 本地终端通道(也是 demo/测试通道) |
-| `channels/feishu.py` | 飞书: 自定义机器人 webhook(仅发送) + 应用机器人(收发, 事件长连接, AES 解密) |
-| `channels/qq.py` | QQ: OneBot11 反向 WebSocket(NapCat / Lagrange / LLOneBot / go-cqhttp) |
-| `channels/qq_official.py` | QQ: **官方开放平台机器人 API**(q.qq.com, 官方 WebSocket 长连接收发 C2C 私聊, 无需协议端) |
-| `channels/webhook.py` | 通用本地 HTTP 入站端点, 任何工具都能 POST 消息进来 |
-| `channels/woa.py` | WPS 协作 (WOA) — ⚠️ 已弃用(需管理员审核)，代码保留备用 |
-| `server.py` | 本地管理 HTTP API: `/status`(含待确认问题内容) `/prompt` `/message` `/answer` `/approval` `/bind` `/attachment` |
+| 只用 QQ | **dsh-qq 插件**（QQ 官方开放平台机器人，C2C 私聊） |
+| 只用飞书 | **dsh-feishu 插件**（飞书应用机器人，双向收发） |
+| 一个进程同时接多个 IM（飞书 / QQ / Webhook / 终端） | **Python 桥接程序** |
 
-### 会话绑定
+两款插件都是 **DeepSeek Harness 官方规范插件**（Node.js Cordis 插件），装进 dsh 的 profile 即可生效，**不是 pip 包**。
 
-每个 IM 会话(conversation) ↔ 一个 dsh 会话(session) 的映射持久化在 `bridge-state.json`:
-
-* 首次发消息自动建一个 dsh 会话并绑定;
-* `/attach <会话ID>` 绑定到已有会话; `/new` 新建并绑定;
-* 会话绑定后, 该 dsh 会话的 `assistant/message`、`tool/result`(错误/有输出)、`turn/end`(任务完成) 会推送到 IM;
-* `question/requested` / `approval/requested` 会推送到 IM, **直接回复即可应答**（如 `1` / `1,2` / 选项文字 / `跳过` / `取消` / `允许` / `拒绝`），或用 HTTP API 应答;
-* `/cancel` 中断绑定会话(例如它卡在等待确认上), `/history [N]` 拉取最近记录;
-* 桥接重启后, dsh 会重新推送未答复的问题(只要会话已绑定), 桥接会自动重新捕获并通知你; 另有兜底检测提醒"离线期间未答复的确认请求", 可用 `/cancel` 或 `/history` 处理。
+- **dsh-qq** → [中文文档](plugins/dsh-qq/README.md) ｜ [English](plugins/dsh-qq/README.en.md)
+- **dsh-feishu** → [中文文档](plugins/dsh-feishu/README.md) ｜ [English](plugins/dsh-feishu/README.en.md)
 
 ---
 
-## 快速开始
+## dsh-qq 插件
+
+在 QQ 里私聊机器人，即可指挥本机的 dsh：
+
+```
+你：帮我写一个 hello.py 并运行
+dsh：✅ 已创建并运行，输出：...
+```
+
+特性：
+
+- QQ 官方开放平台机器人 API，官方 WebSocket 长连接，无需第三方协议端
+- C2C 私聊双向：QQ 消息 → dsh 执行 → 结果 / 完成推回 QQ
+- 自动绑定：每个 QQ 用户对应一个稳定的 dsh 会话
+- 超长回复自动拆分（`[1/N]`），不丢内容
+
+安装与 QQ 开放平台配置教程 → [dsh-qq 中文文档](plugins/dsh-qq/README.md) ｜ [English](plugins/dsh-qq/README.en.md)
+
+---
+
+## dsh-feishu 插件
+
+在飞书里私聊机器人 / 群里 @ 机器人，即可指挥本机的 dsh：
+
+```
+你：帮我写一个 hello.py 并运行
+dsh：✅ 已创建并运行，输出：...
+```
+
+特性：
+
+- 飞书开放平台：应用机器人（收发双向）或自定义机器人 webhook（仅发送通知）
+- 飞书消息 → dsh 执行 → 结果 / 完成推回飞书
+- 自动绑定：每个飞书会话（chat_id）对应一个稳定的 dsh 会话
+- 超长回复自动拆分（`[1/N]`），不丢内容
+
+安装与飞书开放平台配置教程 → [dsh-feishu 中文文档](plugins/dsh-feishu/README.md) ｜ [English](plugins/dsh-feishu/README.en.md)
+
+---
+
+## Python 桥接程序
+
+一个独立的 Python 进程，通过 dsh web 的回环 `/api` 协议，把多个 IM 通道（飞书 / QQ / Webhook / 终端）接到 dsh，无需改动 dsh 本体。
 
 ```bash
-# 1) 准备 (Windows / Ubuntu 均可)
+# 安装
 python -m venv .venv
 .\.venv\Scripts\activate        # Windows
 source .venv/bin/activate       # Ubuntu
+pip install -e .
 
-pip install -e .[dev]
+# 配置（按需开启 feishu / qq / qq_official 并填入凭据）
+cp config.example.yaml config.yaml
 
-# 2) 配置
-cp config.example.yaml config.yaml   # 按需开启 feishu/qq/qq_official 并填入凭据
-cp .env.example .env                 # 或把凭据放进 .env(启动时自动读取)
-
-# 3) 全量自检（推荐先跑一次；加 --pytest 连单测一起跑 = 发布体检）
-python scripts/verify_all.py --auto 4
-python scripts/verify_all.py --auto 4 --pytest   # 单测 + 环境 + 确认流程
-
-# 4) 运行（安装后可直接用 dsh-im-bridge 命令）
-dsh-im-bridge --config config.yaml            # 等价: python -m dsh_im_bridge
-dsh-im-bridge --config config.yaml --log-file bridge.log   # 记录日志到文件
-
-# 4b) 联调真实通道后，先用 --test-notify 发一条测试消息确认通道已就绪
-dsh-im-bridge --config config.yaml --test-notify feishu             # 发到飞书群
-dsh-im-bridge --config config.yaml --test-notify qq --notify-target group:12345
-dsh-im-bridge --config config.yaml --test-notify qq_official --notify-target <openid>
-
-# 管理 API: http://127.0.0.1:8764/status
+# 运行
+dsh-im-bridge --config config.yaml
 ```
 
-### 无凭据先跑通 (console + webhook 通道)
+### 会话绑定
 
-```bash
-python -m dsh_im_bridge          # 默认只启用 console + webhook 通道
-```
+每个 IM 会话 ↔ 一个 dsh 会话，映射持久化在 `bridge-state.json`：
 
-然后另开一个终端, 向 webhook 通道注入消息(首次会自动建会话并绑定):
+- 首次发消息自动新建并绑定；
+- `/attach <会话ID>` 绑定已有会话；`/new` 新建并绑定；
+- 绑定后，dsh 的回复 / 任务完成 / 需要确认都会推回 IM；
+- **直接回复即可应答**确认请求（如 `1`、`允许`、`拒绝`）；
+- `/cancel` 中断当前任务；`/history [N]` 查看最近记录。
 
-```bash
-curl -X POST http://127.0.0.1:8765/message \
-  -H 'content-type: application/json' \
-  -d '{"text": "帮我写一个 hello.py 并运行"}'
-```
+### 常驻运行
 
-> ⚠️ 注入中文请用 curl/Python(UTF-8)。**Windows PowerShell 的 `Invoke-RestMethod` 会按 ASCII 编码 JSON 体, 把中文变成 `????`**, 导致 agent 看到乱码。
-
-通知会打印在桥接进程的 stdout 上。
-
-### 对真实 dsh 的端到端自测
-
-```bash
-# 会在 dsh 里新建会话, 发一条提示, 观察 turn/end 通知转发
-python scripts/e2e_smoke.py --cwd "D:/mycode/python/local-dev"
-```
-
-### 确认流程演示 (不需要真实账号)
-
-```bash
-python scripts/demo_confirmation.py            # 手动回答
-python scripts/demo_confirmation.py --auto 4   # 4 秒后自动回答
-python scripts/demo_woa.py                     # WOA(WPS 协作)通道端到端演示(已弃用，备用)
-python scripts/demo_im.py                      # 飞书 + QQ 端到端演示(假服务器，无凭据预览)
-```
-
-用模拟的 wire 跑通"agent 提问 → 你直接回复 `1` → agent 继续"的完整闭环(真实 Hub/通道代码)。`demo_im.py` 演示飞书(长连接)/QQ(OneBot WS)消息 → 桥接 → dsh → 回复发回平台的全链路。
-
-### 常驻运行 (Windows / Ubuntu)
-
-```bash
-# Ubuntu: 一键装成 systemd 服务(登录/开机自启、崩溃自动重启)
-sudo ./scripts/install-systemd.sh /abs/path/to/dsh-im-bridge
-sudo journalctl -u dsh-im-bridge -f
-```
-
-**Windows 整链路自启（dsh web + 桥接，推荐，无需管理员）：**
-
-`scripts/start-dsh-stack.ps1` 会在登录时**幂等**地拉起完整链路：检测 `:10010` 未运行就启动 dsh web → 等它就绪 → 检测 `:8764` 未运行就启动桥接（已运行的进程不受影响）。把它装进用户启动文件夹，登录即自动运行：
-
-```bash
-# 安装自启（在 Startup 文件夹放一个隐藏 VBS 启动器，登录静默运行）
-powershell -ExecutionPolicy Bypass -File scripts\install-startup.ps1
-# 手动测试一次（幂等，可重复运行）
-powershell -ExecutionPolicy Bypass -File scripts\start-dsh-stack.ps1
-# 移除自启
-powershell -ExecutionPolicy Bypass -File scripts\install-startup.ps1 -Unregister
-```
-
-> ⚠️ 计划任务方案 `install-windows-task.ps1` 需要管理员权限（注册登录计划任务）；非管理员机器上会报 Access denied，此时用上面的启动文件夹方案即可。
-
-手动前台运行: `scripts\run_bridge.ps1`(Windows) 或 `./scripts/run_bridge.sh`(Ubuntu)。
+- **Windows**：运行 `scripts\install-startup.ps1`，登录时自动拉起 dsh web 和桥接（无需管理员）。
+- **Ubuntu**：`sudo ./scripts/install-systemd.sh <绝对路径>` 装成 systemd 服务，开机自启、崩溃自动重启。
 
 ---
 
-## 桥接管理 API (`server.py`, 默认 127.0.0.1:8764)
+## 更多文档
 
-| 路由 | 说明 |
-|---|---|
-| `GET /health` | 存活检查 |
-| `GET /status` | dsh + 通道 + 绑定 + 待确认列表 |
-| `GET /attachment?sessionId=..&attachmentId=..` | 取回会话图片(base64) |
-| `POST /prompt` | `{"sessionId": "...", "text": "..."}` 直接发提示 |
-| `POST /message` | `{"channel": "webhook", "conversation_id": "x", "text": "..."}` 经某通道注入 |
-| `POST /answer` | `{"channel","conversation_id","text":"1:选项A,2:自定义"}` 回答待确认问题 |
-| `POST /approval` | `{"channel","conversation_id","outcome":"allow|reject"}` 审批 |
-| `POST /bind` | `{"channel","conversation_id","session_id"}` 绑定会话 |
-
----
-
-## 开发 & 测试
-
-```bash
-python -m pytest -q        # 68 个单测(不依赖真实网络/账号)
-```
-
-### 图片/附件
-
-agent 消息里带图时, IM 文本会显示 `[图片: 名字]` + `📎 附件 [attachmentId=...]` 提示。取回真实图片:
-
-```bash
-python scripts/fetch_attachment.py <sessionId> <attachmentId> -o out.png
-# 或经桥接 API: GET http://127.0.0.1:8764/attachment?sessionId=..&attachmentId=..
-```
-
-> 飞书/QQ 通道的图片上传(im/v1/images / OneBot image)等拿到真账号后接入。
-
-测试覆盖: 线协议解析、DshClient(unary/respond/mux 重连)、Hub 路由(自动绑定、事件转发、问题/审批应答、指令、状态持久化)、QQ OneBot 收发、webhook HTTP。
-
-## 目录
-
-```
-src/dsh_im_bridge/
-  dsh_client.py    dsh /api 客户端
-  parser.py        线协议帧解析
-  events.py        事件模型
-  formatter.py     事件→IM 文本渲染
-  hub.py           路由核心
-  server.py        管理 HTTP API
-  httpx.py         极简线程 HTTP 服务器
-  channels/        console / feishu / qq / qq_official / webhook / woa
-plugins/           两款 dsh 官方规范插件（Node.js Cordis 插件，npm 包 + dsh.bundle.patch + cordis.patch.yml）
-  dsh-qq/          dsh ↔ QQ 官方开放平台机器人（C2C 私聊），装进 dsh profile 使用
-  dsh-feishu/      dsh ↔ 飞书应用机器人，装进 dsh profile 使用
-scripts/           probe_dsh_api / probe_dsh_mux / probe_session / e2e_smoke
-tests/             单测
-```
+- [English README](README.en.md)
+- [联调指南 INTEGRATION.md](INTEGRATION.md)
