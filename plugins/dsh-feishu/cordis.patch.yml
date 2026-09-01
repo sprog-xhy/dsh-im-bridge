@@ -1,0 +1,18 @@
+# dsh-feishu bundle patch: register the Feishu app-bot bridge as a Cordis
+# plugin row that routes Feishu messages into dsh agents and pushes replies
+# back to Feishu.
+#
+# Applies after @deepseek-ai/dsh-base (or your base layer). Credentials are
+# resolved through the dsh credentials service / environment by default (see
+# `appIdEnv` / `appSecretEnv`); you may also set them inline here.
+
+- insert:
+    - id: dsh-feishu
+      name: 'dsh-feishu'
+      config:
+        appIdEnv: FEISHU_APP_ID
+        appSecretEnv: FEISHU_APP_SECRET
+        # webhookUrl: ""       # optional: custom-bot webhook (send-only) — overrides app bot for send
+        receiveChatTypes: [p2p, group]
+        sandbox: false
+        # allowUsers: []       # optional: only allow these openids
