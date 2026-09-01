@@ -123,7 +123,9 @@ export function apply(ctx, config) {
       agent.followup(
         createUserMessage({
           content: [{ type: "text", text }],
-          source: { kind: "plugin", plugin: "dsh-feishu" },
+          // 消息来自真实用户（经 IM 桥接）；与官方 session.prompt seam 相同的
+          // source 标记（web api-proxy 用 {kind:'user', rpcId}，headless 用 {kind:'user'}）。
+          source: { kind: "user" },
         }),
       );
     },
