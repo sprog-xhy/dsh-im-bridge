@@ -151,3 +151,38 @@ def truncate(text: str, max_chars: int = 2000) -> str:
     if max_chars <= 0 or len(text) <= max_chars:
         return text
     return text[:max_chars] + "\n…(内容过长已截断)"
+
+
+def split_message(text: str, max_chars: int = 2000) -> list[str]:
+    """Split long text into numbered sequential chunks ``[1/N]``, ``[2/N]``, ...
+
+    Unlike :func:`truncate`, nothing is dropped: every part is delivered, so a
+    very long agent reply can be read in full across several chat messages.
+    Each returned chunk (marker included) is at most ``max_chars`` code points.
+
+    Breaks are preferred at line boundaries; a single over-long line (e.g. a
+    huge code/JSON blob) is hard-split. Returns ``[text]`` unchanged when it
+    fits in one message.
+    """
+    if max_chars <= 0 or len(text) <= max_chars:
+        return [text]
+
+    # Reserve marker width: a worst-case "[NNN/NNN] " (~12 chars) before cutting.
+    budget = max(max_chars - 12, 1)
+    parts: list[str] = []
+    remaining = text
+    while len(remaining) > budget:
+        cut = budget
+        # Prefer the last newline inside the budget so paragraphs stay intact.
+        nl = remaining.rfind("\n", 0, cut)
+        if nl >= budget // 2:
+            cut = nl + 1
+        parts.append(remaining[:cut])
+        remaining = remaining[cut:]
+    if remaining:
+        parts.append(remaining)
+
+    if len(parts) <= 1:
+        return parts
+    total = len(parts)
+    return [f"[{i}/{total}] {part}" for i, part in enumerate(parts, 1)]

@@ -38,6 +38,7 @@ from .formatter import (
     render_approval,
     render_question,
     render_session_event,
+    split_message,
     truncate,
     welcome_text,
 )
@@ -84,6 +85,7 @@ class BridgeHub:
         state_file: Optional[Path] = None,
         forward_events: Optional[frozenset] = None,
         max_message_chars: int = 2000,
+        split_long_messages: bool = True,
         default_workspace_id: Optional[str] = None,
         default_cwd: Optional[str] = None,
         agent_preset: Optional[str] = None,
@@ -101,6 +103,7 @@ class BridgeHub:
             forward_events if forward_events is not None else DEFAULT_FORWARD_EVENTS
         )
         self.max_message_chars = max_message_chars
+        self.split_long_messages = split_long_messages
         self.default_workspace_id = default_workspace_id
         self.default_cwd = default_cwd
         self.agent_preset = agent_preset
@@ -427,7 +430,7 @@ class BridgeHub:
         )
         for key in list(keys):
             channel_name, conversation_id = self._split_key(key)
-            await self._send(channel_name, conversation_id, truncate(text, self.max_message_chars), kind="question")
+            await self._send(channel_name, conversation_id, text, kind="question")
 
     async def _on_frame(self, parsed: dict) -> None:
         kind = parsed.get("kind")
@@ -488,7 +491,6 @@ class BridgeHub:
             hint = attachment_hint(event)
             if hint:
                 text += hint
-        text = truncate(text, self.max_message_chars)
         for key in list(keys):
             channel_name, conversation_id = self._split_key(key)
             await self._send(channel_name, conversation_id, text, kind="event")
@@ -499,7 +501,7 @@ class BridgeHub:
         if not keys:
             log.info("question for unbound session %s; ignored", question.session_id)
             return
-        text = truncate(render_question(question), self.max_message_chars)
+        text = render_question(question)
         self.pending[question.rpc_id] = {
             "kind": "question",
             "session_id": question.session_id,
@@ -521,7 +523,7 @@ class BridgeHub:
             "approval_id": approval.approval_id,
             "conversations": list(keys),
         }
-        text = truncate(render_approval(approval), self.max_message_chars)
+        text = render_approval(approval)
         for key in list(keys):
             channel_name, conversation_id = self._split_key(key)
             await self._send(channel_name, conversation_id, text, kind="approval")
@@ -639,7 +641,8 @@ class BridgeHub:
             await self._send(
                 message.channel,
                 message.conversation_id,
-                truncate("\n".join(lines), self.max_message_chars),
+                "\n".join(lines),
+                kind="event",
             )
         except DshError as exc:
             await self._send(message.channel, message.conversation_id, f"列出会话失败: {exc}", kind="error")
@@ -728,7 +731,7 @@ class BridgeHub:
         await self._send(
             message.channel,
             message.conversation_id,
-            truncate("\n".join(lines), self.max_message_chars),
+            "\n".join(lines),
         )
 
     async def _cmd_approval(self, message: InboundMessage, key: str, outcome: str) -> None:
@@ -759,6 +762,18 @@ class BridgeHub:
         if channel is None:
             log.warning("no channel %r to deliver message", channel_name)
             return
+        # Long messages are delivered as numbered sequential parts ([1/N] …)
+        # instead of being truncated, so nothing is lost on QQ/Feishu (which
+        # cap a single message's length). With splitting disabled we fall back
+        # to the old truncation behaviour.
+        if self.split_long_messages:
+            parts = split_message(text, self.max_message_chars)
+        else:
+            parts = [truncate(text, self.max_message_chars)]
+        for part in parts:
+            await self._send_one(channel, conversation_id, part, kind)
+
+    async def _send_one(self, channel, conversation_id: str, text: str, kind: str) -> None:
         # Retry a few times with a short backoff: a transient network blip on a
         # chat platform must not silently drop a task-completion / confirmation
         # notification.
@@ -771,11 +786,11 @@ class BridgeHub:
                 if attempt < attempts:
                     delay = self.send_retry_delay * attempt
                     log.warning("channel %s send failed (attempt %d/%d): %s; retrying in %.1fs",
-                                channel_name, attempt, attempts, exc, delay)
+                                channel.name, attempt, attempts, exc, delay)
                     await asyncio.sleep(delay)
                 else:
                     log.exception("channel %s send failed after %d attempts: %s",
-                                  channel_name, attempts, exc)
+                                  channel.name, attempts, exc)
 
     # -- binding helpers ---------------------------------------------------
     @staticmethod
