@@ -19,3 +19,7 @@ logs/
 
 # Local research scratch (raw wiki HTML / SDK source snapshots — not part of the repo)
 _research/
+
+# Node plugins (dsh-qq / dsh-feishu)
+node_modules/
+pnpm-lock.yaml

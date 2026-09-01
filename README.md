@@ -17,39 +17,37 @@ Cross-platform: Windows + Ubuntu (Python ≥ 3.10). 已在 Windows 和 Ubuntu(WS
 
 ---
 
-## 仓库组成：原程序 + 两款独立插件
+## 仓库组成：原程序 + 两款 dsh 官方规范插件
 
-本仓库既包含一个**通用桥接程序**，也提供两个**可独立安装的 dsh 插件**（只接一个 IM，用户无需关心整个仓库）：
+本仓库包含一个**通用桥接程序**（原程序），以及两个**符合 DeepSeek Harness 插件规范的独立插件**（Node.js Cordis 插件，按 dsh 官方规范开发）：
 
 | 组件 | 位置 | 说明 | 面向用户 |
 |---|---|---|---|
-| **dsh-im-bridge（原程序）** | 仓库根 `src/dsh_im_bridge/` | 通用桥接：一个进程可同时接飞书 / QQ / Webhook / Console 等，支持多通道混跑 | 想在一个桥接里用多个 IM 的人 |
-| **dsh-qq 插件** | [`plugins/dsh-qq/`](plugins/dsh-qq/README.md) | 只把 dsh 桥接到 **QQ 官方开放平台机器人**（C2C 私聊），独立安装即用 | 只用 QQ 的人 |
-| **dsh-feishu 插件** | [`plugins/dsh-feishu/`](plugins/dsh-feishu/README.md) | 只把 dsh 桥接到**飞书应用机器人**，独立安装即用 | 只用飞书的人 |
+| **dsh-im-bridge（原程序）** | 仓库根 `src/dsh_im_bridge/` | 通用 Python 桥接：一个进程可同时接飞书 / QQ / Webhook / Console 等，支持多通道混跑 | 想用一个独立桥接进程接多个 IM 的人 |
+| **dsh-qq 插件** | [`plugins/dsh-qq/`](plugins/dsh-qq/README.md) | **dsh 官方规范插件**：把 dsh 桥接到 QQ 官方开放平台机器人（C2C 私聊），Node.js Cordis 插件 | 只用 QQ、按 dsh 插件方式装进 profile 的人 |
+| **dsh-feishu 插件** | [`plugins/dsh-feishu/`](plugins/dsh-feishu/README.md) | **dsh 官方规范插件**：把 dsh 桥接到飞书应用机器人，Node.js Cordis 插件 | 只用飞书、按 dsh 插件方式装进 profile 的人 |
 
-### 快速安装（先装核心，再装你想用的插件）
+> 两款插件不是 pip 包，而是 **dsh 官方插件**（npm 包 + `dsh.bundle.patch` + `cordis.patch.yml`），与官方插件 `dsh-web-search-wps` 同一机制，装进 `~/.dsh/profiles/<name>` 的 `node_modules` 并在 `dsh.profile.bundles` 登记后生效。
+
+### 快速安装（两款插件，按 dsh 插件规范）
 
 ```bash
-# 在仓库根安装核心 dsh-im-bridge（插件都依赖它）
-pip install -e .
-
-# 只装 QQ 插件
-pip install -e plugins/dsh-qq
-dsh-qq --help
-
-# 只装飞书插件
-pip install -e plugins/dsh-feishu
-dsh-feishu --help
+# 1) 把插件登记进你的 dsh profile（例如 web）
+cd ~/.dsh/profiles/web
+pnpm add link:<本仓库绝对路径>/plugins/dsh-qq
+pnpm add link:<本仓库绝对路径>/plugins/dsh-feishu
 ```
 
-> 核心发布到 PyPI 后，可用 `pip install dsh-im-bridge && pip install dsh-qq`（或 `dsh-feishu`）一步装好。
+然后在 `~/.dsh/profiles/web/package.json` 的 `dsh.profile.bundles` 数组里加上 `"dsh-qq"` 与 `"dsh-feishu"`，**重启 dsh web** 即加载。
+
+> 发布到 npm/私有源后：`cd ~/.dsh/profiles/web && pnpm add dsh-qq dsh-feishu`（同样登记 bundles）。
 
 ### 开发者平台配置教程（两款插件各自有完整教程）
 
-- **QQ**：见 [`plugins/dsh-qq/README.md`](plugins/dsh-qq/README.md) —— 在 [q.qq.com](https://q.qq.com) 建机器人应用、拿 AppID/AppSecret、开启 C2C 私聊、沙箱/正式切换、加好友验证。
-- **飞书**：见 [`plugins/dsh-feishu/README.md`](plugins/dsh-feishu/README.md) —— 在[飞书开放平台](https://open.feishu.cn/app)建应用、开 `im:message` 权限、配事件订阅长连接、拿 AppID/AppSecret。
+- **QQ**：见 [`plugins/dsh-qq/README.md`](plugins/dsh-qq/README.md) —— 在 [q.qq.com](https://q.qq.com) 建机器人应用、拿 AppID/AppSecret、开启 C2C 私聊、沙箱/正式切换、加好友验证；凭据经 dsh 凭据/环境解析。
+- **飞书**：见 [`plugins/dsh-feishu/README.md`](plugins/dsh-feishu/README.md) —— 在[飞书开放平台](https://open.feishu.cn/app)建应用、开 `im:message` 权限、配事件订阅长连接、拿 AppID/AppSecret；凭据经 dsh 凭据/环境解析。
 
-**核心运行机制两款插件相同**：复用本仓库 `dsh-im-bridge` 核心（DshClient / BridgeHub / 事件 / 格式化），只是通过 `--only qq_official` 或 `--only feishu` 只启用对应单通道。这样插件极薄、不重复实现，用户也只需安装用到的那个插件。
+**核心运行机制两款插件相同**：都是 dsh 规范插件，在 dsh 进程内用 `ctx.agents.create` + `agent.followup` 把 IM 消息注入 dsh 会话，并订阅 `session/event` 把回复/完成/失败推回 IM——不依赖本仓库的 Python 桥接进程，也不用 pip。
 
 ---
 
@@ -238,9 +236,9 @@ src/dsh_im_bridge/
   server.py        管理 HTTP API
   httpx.py         极简线程 HTTP 服务器
   channels/        console / feishu / qq / qq_official / webhook / woa
-plugins/           独立插件（各含自己的 README / 配置模板 / 入口）
-  dsh-qq/          dsh ↔ QQ 官方开放平台机器人（C2C 私聊）
-  dsh-feishu/      dsh ↔ 飞书应用机器人
+plugins/           两款 dsh 官方规范插件（Node.js Cordis 插件，npm 包 + dsh.bundle.patch + cordis.patch.yml）
+  dsh-qq/          dsh ↔ QQ 官方开放平台机器人（C2C 私聊），装进 dsh profile 使用
+  dsh-feishu/      dsh ↔ 飞书应用机器人，装进 dsh profile 使用
 scripts/           probe_dsh_api / probe_dsh_mux / probe_session / e2e_smoke
 tests/             单测
 ```
