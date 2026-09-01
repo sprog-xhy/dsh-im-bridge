@@ -48,6 +48,7 @@ class Config:
     agent_preset: Optional[str]
     forward_events: frozenset
     max_message_chars: int
+    split_long_messages: bool
     catch_up: bool
     catch_up_max_events: int
     notify_on_start: bool
@@ -214,6 +215,10 @@ def load_config(path: Optional[str] = None) -> Config:
             else DEFAULT_FORWARD_EVENTS
         ),
         max_message_chars=int(bridge.get("maxMessageChars", 2000)),
+        split_long_messages=(
+            str(_env("SPLIT_LONG_MESSAGES", str(bridge.get("splitLongMessages", "true")))).lower()
+            not in ("0", "false", "no", "off")
+        ),
         catch_up=bool(bridge.get("catchUp", True)),
         catch_up_max_events=int(bridge.get("catchUpMaxEvents", 200)),
         notify_on_start=bool(bridge.get("notifyOnStart", True)),

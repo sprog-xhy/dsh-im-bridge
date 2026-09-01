@@ -191,6 +191,7 @@ async def _amain(args: argparse.Namespace) -> int:
         state_file=state_file,
         forward_events=config.forward_events,
         max_message_chars=config.max_message_chars,
+        split_long_messages=config.split_long_messages,
         default_workspace_id=config.default_workspace_id,
         default_cwd=config.default_cwd,
         agent_preset=config.agent_preset,

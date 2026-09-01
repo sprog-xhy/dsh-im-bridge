@@ -20,7 +20,8 @@ bridge:
   # Default: user/message, assistant/message, tool/result, turn/end.
   # (step/end 默认不转发, 否则多步骤任务会刷屏; turn/end 已代表"任务完成")
   # forwardEvents: ["user/message", "assistant/message", "tool/result", "turn/end"]
-  maxMessageChars: 2000
+  maxMessageChars: 2000      # 单条 IM 消息上限(字符)。超过时默认自动拆成多条 [1/N] 顺序发送
+  splitLongMessages: true    # true=超长自动拆分(不丢内容); false=超长直接截断(旧行为)
   # On restart, backfill notifications missed while the bridge was down
   # (only for sessions that were already running before; new sessions start live).
   catchUp: true
