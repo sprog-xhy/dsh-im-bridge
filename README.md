@@ -17,6 +17,39 @@ Cross-platform: Windows + Ubuntu (Python ≥ 3.10). 已在 Windows 和 Ubuntu(WS
 
 ---
 
+## 仓库组成：原程序 + 两款独立插件
+
+本仓库既包含一个**通用桥接程序**，也提供两个**可独立安装的 dsh 插件**（只接一个 IM，用户无需关心整个仓库）：
+
+| 组件 | 位置 | 说明 | 面向用户 |
+|---|---|---|---|
+| **dsh-im-bridge（原程序）** | 仓库根 `src/dsh_im_bridge/` | 通用桥接：一个进程可同时接飞书 / QQ / Webhook / Console 等，支持多通道混跑 | 想在一个桥接里用多个 IM 的人 |
+| **dsh-qq 插件** | [`plugins/dsh-qq/`](plugins/dsh-qq/README.md) | 只把 dsh 桥接到 **QQ 官方开放平台机器人**（C2C 私聊），独立安装即用 | 只用 QQ 的人 |
+| **dsh-feishu 插件** | [`plugins/dsh-feishu/`](plugins/dsh-feishu/README.md) | 只把 dsh 桥接到**飞书应用机器人**，独立安装即用 | 只用飞书的人 |
+
+### 快速安装（两款插件各一行）
+
+```bash
+# 只装 QQ 插件（自动拉取 dsh-im-bridge 核心）
+pip install dsh-im-bridge && pip install dsh-qq
+dsh-qq --help
+
+# 只装飞书插件
+pip install dsh-im-bridge && pip install dsh-feishu
+dsh-feishu --help
+```
+
+> 从本仓库源码安装：`cd plugins/dsh-qq && pip install -e .`（或 `plugins/dsh-feishu`）。
+
+### 开发者平台配置教程（两款插件各自有完整教程）
+
+- **QQ**：见 [`plugins/dsh-qq/README.md`](plugins/dsh-qq/README.md) —— 在 [q.qq.com](https://q.qq.com) 建机器人应用、拿 AppID/AppSecret、开启 C2C 私聊、沙箱/正式切换、加好友验证。
+- **飞书**：见 [`plugins/dsh-feishu/README.md`](plugins/dsh-feishu/README.md) —— 在[飞书开放平台](https://open.feishu.cn/app)建应用、开 `im:message` 权限、配事件订阅长连接、拿 AppID/AppSecret。
+
+**核心运行机制两款插件相同**：复用本仓库 `dsh-im-bridge` 核心（DshClient / BridgeHub / 事件 / 格式化），只是通过 `--only qq_official` 或 `--only feishu` 只启用对应单通道。这样插件极薄、不重复实现，用户也只需安装用到的那个插件。
+
+---
+
 ## 架构
 
 ```
@@ -201,7 +234,10 @@ src/dsh_im_bridge/
   hub.py           路由核心
   server.py        管理 HTTP API
   httpx.py         极简线程 HTTP 服务器
-  channels/        console / feishu / qq / webhook / woa
+  channels/        console / feishu / qq / qq_official / webhook / woa
+plugins/           独立插件（各含自己的 README / 配置模板 / 入口）
+  dsh-qq/          dsh ↔ QQ 官方开放平台机器人（C2C 私聊）
+  dsh-feishu/      dsh ↔ 飞书应用机器人
 scripts/           probe_dsh_api / probe_dsh_mux / probe_session / e2e_smoke
 tests/             单测
 ```
