@@ -8,6 +8,7 @@ import logging
 import signal
 import sys
 from pathlib import Path
+from typing import Optional
 
 from .channels import create_channel
 from .config import load_config
@@ -61,6 +62,8 @@ async def _test_notify(config, channel_name: str, target: str) -> int:
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="dsh-im-bridge", description="Bridge dsh agents to IM tools")
     p.add_argument("--config", default=None, help="path to a YAML config file")
+    p.add_argument("--only", default=None, metavar="CHANNEL",
+                   help="仅启用指定通道（如 --only qq_official），忽略配置里的其他通道；供单通道插件使用")
     p.add_argument("--dsh", default=None, help="dsh web base URL (overrides config)")
     p.add_argument("--api-port", type=int, default=None, help="bridge management API port")
     p.add_argument("--verbose", action="store_true", help="debug logging")
@@ -166,12 +169,9 @@ async def _check(config, config_path) -> int:
     return 0 if ok else 1
 
 
-async def _amain(args: argparse.Namespace) -> int:
-    config = load_config(args.config)
-    if args.dsh:
-        config.dsh_base_url = args.dsh
-    if args.api_port:
-        config.bridge_api_port = args.api_port
+async def _amain(config, args: argparse.Namespace = None) -> int:
+    if args is None:
+        args = argparse.Namespace(data_dir=None)
 
     errors, warnings = config.validate()
     for w in warnings:
@@ -256,6 +256,30 @@ async def _amain(args: argparse.Namespace) -> int:
     return 0
 
 
+def _apply_only(config, only: Optional[str]):
+    """Restrict ``config.channels`` to a single channel.
+
+    Used by the standalone per-channel plugins (``dsh-qq`` / ``dsh-feishu``):
+    a user installing only one plugin gets a bridge that talks to just that IM
+    platform regardless of what else is in the config file. Returns the same
+    config object mutated in place; raises ValueError on an unknown or disabled
+    channel.
+    """
+    if not only:
+        return config
+    from .channels import available_channels
+
+    if only not in available_channels():
+        raise ValueError(f"unknown channel {only!r}")
+    if only not in config.channels:
+        raise ValueError(
+            f"channel {only!r} is not enabled in the config "
+            f"(enabled: {', '.join(config.channels) or 'none'})"
+        )
+    config.channels = {only: config.channels[only]}
+    return config
+
+
 def main(argv: list | None = None) -> int:
     args = _build_parser().parse_args(argv)
     # Windows consoles default to the local codepage (e.g. GBK) and crash on
@@ -267,15 +291,21 @@ def main(argv: list | None = None) -> int:
             pass
     _configure_logging(args)
     try:
+        config = load_config(args.config)
+        if args.dsh:
+            config.dsh_base_url = args.dsh
+        if args.api_port:
+            config.bridge_api_port = args.api_port
+        try:
+            config = _apply_only(config, args.only)
+        except ValueError as exc:
+            print(f"❌ {exc}", file=sys.stderr)
+            return 2
         if args.check:
-            config = load_config(args.config)
-            if args.dsh:
-                config.dsh_base_url = args.dsh
             return asyncio.run(_check(config, args.config))
         if args.test_notify:
-            config = load_config(args.config)
             return asyncio.run(_test_notify(config, args.test_notify, args.notify_target or ""))
-        return asyncio.run(_amain(args))
+        return asyncio.run(_amain(config, args))
     except KeyboardInterrupt:
         return 0
 
