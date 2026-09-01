@@ -86,6 +86,53 @@ def test_truncate():
     assert "截断" in out
 
 
+def test_split_message_short_unchanged():
+    assert formatter.split_message("short", 2000) == ["short"]
+    assert formatter.split_message("", 2000) == [""]
+
+
+def test_split_message_splits_and_numbered():
+    long_text = "第1行\n" + "x" * 5000 + "\n最后"
+    parts = formatter.split_message(long_text, 100)
+    assert len(parts) > 1
+    # every part is within the limit (marker included)
+    for p in parts:
+        assert len(p) <= 100
+    # numbered markers [i/N]
+    assert parts[0].startswith("[1/")
+    assert parts[-1].startswith("[")
+    # join of de-markered parts equals the original text (nothing lost)
+    import re
+
+    joined = "".join(re.sub(r"^\[\d+/\d+\] ", "", p) for p in parts)
+    assert joined == long_text
+
+
+def test_split_message_single_line_hard_split():
+    blob = "A" * 5000
+    parts = formatter.split_message(blob, 100)
+    assert len(parts) > 1
+    for p in parts:
+        assert len(p) <= 100  # marker included stays within the limit
+    import re
+
+    joined = "".join(re.sub(r"^\[\d+/\d+\] ", "", p) for p in parts)
+    assert joined == blob  # nothing lost
+
+
+def test_split_message_prefers_line_breaks():
+    # 5 lines of 40 chars each: with max_chars=60 (budget 48) each split lands
+    # right after a line's newline, so we get exactly 5 well-formed parts.
+    lines = ["b" * 40] * 5
+    text = "\n".join(lines)
+    parts = formatter.split_message(text, 60)
+    assert len(parts) == 5
+    for p in parts:
+        assert len(p) <= 60
+    # the first N-1 parts are cut exactly after a line's newline
+    assert all(parts[i].endswith("\n") for i in range(len(parts) - 1))
+
+
 def test_events_model_text_of_content_list():
     ev = _ev("user/message", "", extra={"content": [{"type": "text", "text": "hi"}]})
     assert ev.text == "hi"

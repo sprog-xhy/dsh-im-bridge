@@ -17,6 +17,7 @@ def _cfg(**overrides):
         "agent_preset": None,
         "forward_events": frozenset(),
         "max_message_chars": 2000,
+        "split_long_messages": True,
         "catch_up": True,
         "catch_up_max_events": 200,
         "notify_on_start": True,
@@ -118,6 +119,18 @@ def test_load_config_forward_events_custom(tmp_path):
     cfg.write_text("bridge:\n  forwardEvents:\n    - turn/end\n", encoding="utf-8")
     c = load_config(str(cfg))
     assert c.forward_events == frozenset({"turn/end"})
+
+
+def test_load_config_split_long_messages_default_true():
+    c = load_config()
+    assert c.split_long_messages is True
+
+
+def test_load_config_split_long_messages_custom(tmp_path):
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("bridge:\n  splitLongMessages: false\n", encoding="utf-8")
+    c = load_config(str(cfg))
+    assert c.split_long_messages is False
 
 
 def test_load_config_reasoning_and_welcome_defaults(tmp_path):

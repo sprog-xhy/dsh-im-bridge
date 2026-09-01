@@ -640,6 +640,40 @@ async def test_send_gives_up_after_retries_without_raising():
     assert chan.sent == []
 
 
+@pytest.mark.asyncio
+async def test_send_splits_long_message():
+    """A long message is delivered as numbered [1/N] parts, nothing lost."""
+    h = BridgeHub(FakeDsh(), catch_up=False, max_message_chars=60)
+    chan = RecordingChannel()
+    h.register(chan)
+    long_text = "第1行\n" + "x" * 500 + "\n最后"
+    await h._send("rec", "c1", long_text, kind="event")
+    parts = [t for _, t, k in chan.sent]
+    assert len(parts) > 1
+    assert parts[0].startswith("[1/")
+    assert all(len(p) <= 60 for p in parts)
+    # join of de-markered parts == original
+    import re
+
+    joined = "".join(re.sub(r"^\[\d+/\d+\] ", "", p) for p in parts)
+    assert joined == long_text
+    # every part went through the same conversation with kind="event"
+    assert all(k == "event" for _, _, k in chan.sent)
+
+
+@pytest.mark.asyncio
+async def test_send_truncates_when_split_disabled():
+    """With split_long_messages=False, the old truncation behaviour is kept."""
+    h = BridgeHub(FakeDsh(), catch_up=False, max_message_chars=60, split_long_messages=False)
+    chan = RecordingChannel()
+    h.register(chan)
+    await h._send("rec", "c1", "y" * 500, kind="notify")
+    assert len(chan.sent) == 1
+    text = chan.sent[0][1]
+    assert len(text) < 500  # was truncated
+    assert "截断" in text
+
+
 def test_parse_answer_arg():
     assert parse_answer_arg("1:是") == [{"id": "1", "selected": [], "custom": "是"}]
     assert parse_answer_arg("1:是,2:随便") == [
